@@ -6,8 +6,27 @@ Nothing is saved here.
 """
 from . import calc
 from .html import (card, details, esc, field, hidden, num, page as _page,
-                   select)
+                   select, textarea)
 from .server import Response, route
+
+# The page's only script: when a field changes, submit the same GET the
+# Recompute button would, and after the reload put the cursor where it was
+# headed. No arithmetic lives here — every number is rendered by the server.
+SCRIPT = """<script>
+(function(){
+  var f=document.getElementById('targets'); if(!f) return;
+  var k='brew.focus', n=null;
+  try { n=sessionStorage.getItem(k); sessionStorage.removeItem(k); } catch(e){}
+  if(n){ var el=f.elements[n]; if(el){ el.focus(); if(el.select) el.select(); } }
+  f.addEventListener('change', function(e){
+    var els=Array.prototype.slice.call(f.elements), i=els.indexOf(e.target), nx=els[i+1];
+    if(nx && nx.name && !nx.closest('details:not([open])')) {
+      try { sessionStorage.setItem(k, nx.name); } catch(err){}
+    }
+    f.submit();
+  });
+})();
+</script>"""
 
 DEFAULTS = {"gal": "6", "abv": "12", "og": "", "fg": "1.000", "yeast": "71B",
             "yeast_g": "", "demand": "medium", "additions": "4"}
@@ -25,7 +44,7 @@ def plan_from(inp):
                      inp["additions"])
 
 
-def targets_form(inp, p=None):
+def targets_form(inp, p=None, editing=None):
     """Card 1. `p` (a plan) drives the yeast hint; None while input is bad."""
     if p is None:
         yeast_hint = "Blank = 1 g per gallon. Type what you'll actually pitch."
@@ -53,7 +72,8 @@ def targets_form(inp, p=None):
 <span>{select("demand", "Nitrogen demand", [("low", "low"), ("medium", "medium"), ("high", "high")], inp["demand"], "Most wine strains are medium. Check the strain's sheet.")}</span>
 <span>{field("additions", "Fermaid O feedings", inp["additions"], "TOSNA is 4: 24 h, 48 h, 72 h, then by the 1/3 break.", step="1")}</span>
 </div></div>""", open_=more_open)
-    return f"""<form class="inline" method="get" action="/" id="targets">
+    keep = hidden("recipe", editing["slug"]) if editing else ""
+    return f"""<form class="inline" method="get" action="/" id="targets">{keep}
 <div class="grid">
 <span>{field("gal", "Batch volume (gal)", inp["gal"], "Your carboys: 5, 6, 6.8.")}</span>
 <span>{field("abv", "Target strength (% ABV)", inp["abv"], abv_hint)}</span>
@@ -67,7 +87,38 @@ def targets_form(inp, p=None):
 </form>"""
 
 
-def render(params, msg=None, kind="ok"):
+def save_card(inp, p, store, editing=None, params=None):
+    """Card 3: name it and keep it. `editing` is the recipe being redesigned."""
+    params = params or {}
+    honeys = store.honey_names() if store else []
+    honey_list = "".join(f'<option value="{esc(h)}">' for h in honeys)
+    keep = "".join(hidden(k, inp[k]) for k in DEFAULTS)
+    if editing:
+        keep += hidden("from_slug", editing["slug"])
+        label = f"Save changes to {editing['name']}"
+    else:
+        label = "Save recipe"
+    name = params.get("name", editing["name"] if editing else "")
+    honey = params.get("honey", editing.get("honey", "") if editing else "")
+    notes = params.get("notes", editing.get("notes", "") if editing else "")
+    return f"""<form class="inline" method="post" action="/recipes">
+<h2>{"Keep the changes" if editing else "Keep it as a recipe"}</h2>
+<div class="grid">
+<span>{field("name", "Name", name, "The honey and the strength make a good one.", typ="text", required=True)}</span>
+<span>{field("honey", "Honey", honey, "Which honey this was designed around.", typ="text", attrs='list="honeys"')}
+<datalist id="honeys">{honey_list}</datalist></span>
+</div>
+{textarea("notes", "Notes", notes, "Anything the sheet doesn't say: where the honey came from, what you'd change.")}
+{keep}<button>{esc(label)}</button></form>"""
+
+
+def render(params, store=None, msg=None, kind="ok"):
+    editing = None
+    if params.get("recipe") and store:
+        editing = store.load_recipe(params["recipe"])
+        if "gal" not in params:
+            from .views_recipes import inputs_from_recipe
+            params = dict(params, **inputs_from_recipe(editing))
     inp = inputs_from(params)
     err = None
     try:
@@ -75,15 +126,17 @@ def render(params, msg=None, kind="ok"):
     except ValueError as e:
         p, err = None, str(e)
     from .sheet import render_sheet
-    body = targets_form(inp, p)
+    body = targets_form(inp, p, editing)
     if p:
         body += render_sheet(p, f"At {num(p['gal'])} gal you'll need")
+        body += save_card(inp, p, store, editing, params)
     if err:
         msg, kind = err, "err"
-    return _page("Design a recipe", body, "/", msg, kind)
+    title = f"Redesign {editing['name']}" if editing else "Design a recipe"
+    return _page(title, body, "/", msg, kind, tail=SCRIPT)
 
 
 @route("GET", "/")
 def design(req):
-    return Response(render(req.params, req.params.get("msg"),
+    return Response(render(req.params, req.store, req.params.get("msg"),
                            req.params.get("kind", "ok")))

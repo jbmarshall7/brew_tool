@@ -112,7 +112,7 @@ def esc(value):
     return _escape(str(value), quote=True)
 
 
-def page(title, body, active="/", msg=None, kind="ok"):
+def page(title, body, active="/", msg=None, kind="ok", tail=""):
     nav = "".join(
         f'<a href="{href}"{" class=active" if href == active else ""}>'
         f"{esc(label)}</a>" for href, label in NAV)
@@ -122,7 +122,7 @@ def page(title, body, active="/", msg=None, kind="ok"):
             f"<title>{esc(title)} — brew_tool</title><style>{CSS}</style></head>"
             f'<body><header><span class="brand">🍯 brew_tool</span>'
             f"<nav>{nav}</nav></header>"
-            f"<main><h1>{esc(title)}</h1>{top}{body}</main></body></html>")
+            f"<main><h1>{esc(title)}</h1>{top}{body}</main>{tail}</body></html>")
 
 
 def banner(text, kind="ok"):
@@ -188,6 +188,13 @@ def select(name, label, options, value=None, hint=None):
         f"{esc(lbl)}</option>" for v, lbl in options)
     return (f'<label for="f-{esc(name)}">{esc(label)}</label>'
             f'<select id="f-{esc(name)}" name="{esc(name)}">{opts}</select>'
+            + (f'<span class="hint">{esc(hint)}</span>' if hint else ""))
+
+
+def textarea(name, label, value="", hint=None):
+    return (f'<label for="f-{esc(name)}">{esc(label)}</label>'
+            f'<textarea id="f-{esc(name)}" name="{esc(name)}">{esc(value or "")}'
+            "</textarea>"
             + (f'<span class="hint">{esc(hint)}</span>' if hint else ""))
 
 
