@@ -85,6 +85,16 @@ details.sec[open] > summary { border-radius:8px 8px 0 0; }
 details.sec > form.inline, details.sec > .inner { border-radius:0 0 8px 8px;
         margin-top:0; border-top:none; }
 .inner { background:var(--card); border:1px solid var(--line); padding:12px 18px; }
+ol.steps { list-style:none; counter-reset:step; padding:0; margin:12px 0; }
+ol.steps li { counter-increment:step; display:grid; grid-template-columns:40px 1fr;
+              gap:2px 12px; padding:12px 14px; margin:8px 0; background:var(--card);
+              border:1px solid var(--line); border-radius:8px; }
+ol.steps li::before { content:counter(step); grid-row:1 / span 3; width:30px;
+              height:30px; border-radius:50%; background:var(--accent); color:#fff;
+              font-weight:700; display:flex; align-items:center; justify-content:center; }
+ol.steps .stitle { font-size:12.5px; color:var(--mut); text-transform:uppercase;
+              letter-spacing:.3px; font-weight:600; }
+ol.steps .big { font-size:1.4em; font-weight:600; line-height:1.3; }
 @media print {
   header, form, button, details, .msg, .noprint { display:none !important; }
   body { background:#fff; font-size:14px; } main { max-width:none; padding:0; }

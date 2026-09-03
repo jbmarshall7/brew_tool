@@ -110,12 +110,14 @@ def save(req):
 def recipes(req):
     rows = []
     for r in req.store.list_recipes():
+        gal = num(r.get("design_gal"))
         rows.append([raw(f'<a href="/recipes/{esc(r["slug"])}">'
                          f'{esc(r["name"])}</a>'),
                      strength_line(r), r.get("yeast") or "",
                      r.get("honey") or "",
-                     f"{num(r.get('design_gal'))} gal"])
-    body = table(["Recipe", "Strength", "Yeast", "Honey", "Designed at"], rows,
+                     raw(f'<a href="/recipes/{esc(r["slug"])}/must?gal='
+                         f'{esc(gal)}"><b>Make {esc(gal)} gal</b></a>')])
+    body = table(["Recipe", "Strength", "Yeast", "Honey", "Must"], rows,
                  empty="No recipes yet. Design one — it's two numbers.")
     if not rows:
         body += next_link("/", "Design a recipe")
@@ -143,9 +145,10 @@ def recipe(req):
         ("Nutrients", f"{product_name(r.get('product'))} × "
                       f"{r.get('additions')}, {r.get('demand')} demand", None),
     ])
-    scale_form = f"""<form class="inline" method="get" action="/recipes/{esc(r['slug'])}">
-<div class="grid"><span>{field("gal", "Show the sheet for (gal)", num(p['gal']), "Your carboys: 5, 6, 6.8.")}</span></div>
-<button>Show</button></form>"""
+    scale_form = f"""<form class="inline" method="get" action="/recipes/{esc(r['slug'])}/must">
+<div class="grid"><span>{field("gal", "How much are you making? (gal)", num(p['gal']), "Your carboys: 5, 6, 6.8.")}</span></div>
+<button>Make must</button>
+<button class="quiet" formaction="/recipes/{esc(r['slug'])}">Just show the sheet</button></form>"""
     notes = details("Notes", f'<div class="inner">{esc(r["notes"])}</div>') \
         if r.get("notes") else ""
     body = (card(identity)
