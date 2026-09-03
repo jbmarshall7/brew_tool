@@ -135,9 +135,5 @@ def make_server(store=None, host="127.0.0.1", port=8765):
     return ThreadingHTTPServer((host, port), handler)
 
 
-# --- the placeholder home page (replaced by the Design page next) -----------
-@route("GET", "/")
-def home(req):
-    body = html.card("<p>The Design page arrives next: type a batch volume "
-                     "and a target strength, read the whole bench sheet.</p>")
-    return page("brew_tool", body, req, "/")
+# --- views register their routes on import ---------------------------------
+from . import views_design  # noqa: E402,F401
