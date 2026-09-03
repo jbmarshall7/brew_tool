@@ -185,6 +185,9 @@ def field(name, label, value="", hint=None, typ="number", step="any",
     v = "" if value is None else str(value)
     extra = ' inputmode="decimal"' if typ == "number" else ""
     stepattr = f' step="{step}"' if typ == "number" and step else ""
+    if typ == "datetime-local":
+        extra = ' placeholder="2026-09-03T15:40"'
+        stepattr = ' step="60"' 
     req = " required" if required else ""
     return (f'<label for="f-{esc(name)}">{esc(label)}</label>'
             f'<input id="f-{esc(name)}" name="{esc(name)}" type="{typ}" '

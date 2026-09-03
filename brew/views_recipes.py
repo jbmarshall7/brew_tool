@@ -129,7 +129,11 @@ def recipes(req):
 @route("GET", r"/recipes/([a-z0-9-]+)")
 def recipe(req):
     r = req.store.load_recipe(req.args[0])
-    gal_text = req.params.get("gal") or num(r.get("design_gal"))
+    last = req.store.last_batch(r["slug"])
+    gal_text = (req.params.get("gal")
+                or (num(last["volume_gal"]) if last and last.get("volume_gal")
+                    else None)
+                or num(r.get("design_gal")))
     p = plan_for(r, calc.num(gal_text, "volume", 0.1, 1000, " gal"))
     s = r.get("strength") or {}
     strength = (f"{num(s.get('abv'), 1)} % ABV" if s.get("by") == "abv"
@@ -151,11 +155,23 @@ def recipe(req):
 <button class="quiet" formaction="/recipes/{esc(r['slug'])}">Just show the sheet</button></form>"""
     notes = details("Notes", f'<div class="inner">{esc(r["notes"])}</div>') \
         if r.get("notes") else ""
+    batches = req.store.batches_for_recipe(r["slug"])
+    if batches:
+        from .views_batches import when
+        brows = [[raw(f'<a href="/batches/{esc(b["id"])}">{esc(b["id"])}</a>'),
+                  when(b.get("pitched_at")), f"{num(b.get('volume_gal'))} gal",
+                  sg((b.get("measured") or {}).get("og") or 0)
+                  if (b.get("measured") or {}).get("og") else "—"]
+                 for b in batches]
+        batch_block = "<h2>Musts recorded</h2>" + table(
+            ["Batch", "Pitched", "Volume", "OG"], brows)
+    else:
+        batch_block = ""
     body = (card(identity)
             + next_link(f"/?recipe={r['slug']}", "Redesign")
             + scale_form
             + render_sheet(p, f"At {num(p['gal'])} gal you'll need")
-            + notes
+            + notes + batch_block
             + f'<p class="mut">Updated {esc(r.get("updated") or "—")}. '
               f'File: data/recipes/{esc(r["slug"])}.json</p>')
     return Response(_page(r["name"], body, "/recipes", req.params.get("msg"),

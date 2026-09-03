@@ -136,4 +136,4 @@ def make_server(store=None, host="127.0.0.1", port=8765):
 
 
 # --- views register their routes on import ---------------------------------
-from . import views_design, views_recipes, views_must  # noqa: E402,F401
+from . import views_design, views_recipes, views_must, views_batches  # noqa: E402,F401

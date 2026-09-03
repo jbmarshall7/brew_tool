@@ -86,3 +86,44 @@ class Store:
     def yeast_names(self):
         return sorted({r.get("yeast") for r in self.list_recipes()
                        if r.get("yeast")}, key=str.lower)
+
+    # --- batches -------------------------------------------------------------
+    BATCH_ID = re.compile(r"B-(\d{4})-(\d{3})")
+
+    def batch_path(self, batch_id):
+        if not self.BATCH_ID.fullmatch(batch_id or ""):
+            raise ValueError(f"'{batch_id}' isn't a batch id — they look like "
+                             "B-2026-003")
+        return self.batches_dir / f"{batch_id}.json"
+
+    def batch_exists(self, batch_id):
+        try:
+            return self.batch_path(batch_id).exists()
+        except ValueError:
+            return False
+
+    def load_batch(self, batch_id):
+        path = self.batch_path(batch_id)
+        if not path.exists():
+            raise ValueError(f"There's no batch {batch_id}.")
+        return self.read_json(path)
+
+    def save_batch(self, batch):
+        self.write_json(self.batch_path(batch["id"]), batch)
+        return batch
+
+    def list_batches(self):
+        out = [self.read_json(f) for f in self.batches_dir.glob("*.json")]
+        return sorted(out, key=lambda b: (b.get("pitched_at") or "",
+                                          b.get("id") or ""), reverse=True)
+
+    def batches_for_recipe(self, slug):
+        return [b for b in self.list_batches()
+                if (b.get("recipe") or {}).get("slug") == slug]
+
+    def batch_ids(self):
+        return [f.stem for f in self.batches_dir.glob("B-*.json")]
+
+    def last_batch(self, slug=None):
+        batches = self.batches_for_recipe(slug) if slug else self.list_batches()
+        return batches[0] if batches else None
