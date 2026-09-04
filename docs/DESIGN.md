@@ -4,6 +4,15 @@ The spec this round was built to, synthesized on 2026-09-03 from three
 independent designs and a judge panel, after the owner asked for a fresh,
 small rebuild of the over-scoped meadery_tools app focused on usability.
 
+## Changed after the design
+
+- **2026-09-04 — yeast is derived, not typed.** The owner asked why yeast
+  grams were an input at all. They now come from the volume and the OG in
+  whole sachets: 1 g/gal, 2 g/gal above 1.100, to the nearest 5 g sachet
+  (halves round up), never fewer than one (`calc.yeast_for`). The Design
+  page has no yeast-grams field, recipes don't store one, and the must-day
+  record form still asks what actually went in.
+
 Where this document and `tests/` disagree on a digit, the tests win: they
 pin what `brew/calc.py` actually computes at its declared rounding
 boundaries (for example 4 × 6.6 g comes from rounding the exact total,

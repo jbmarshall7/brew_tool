@@ -11,7 +11,7 @@ from brew.server import Request, dispatch
 from brew.store import Store
 
 OWNER = {"gal": "6", "abv": "14", "og": "", "fg": "1.000", "yeast": "71B",
-         "yeast_g": "10", "demand": "medium", "additions": "4",
+         "demand": "medium", "additions": "4",
          "name": "Orange Blossom Traditional", "honey": "orange blossom"}
 MUST = "/recipes/orange-blossom-traditional/must"
 

@@ -11,9 +11,9 @@ from .html import (details, esc, field, hidden, num, page as _page, select,
 from .server import Response, route
 
 DEFAULTS = {"gal": "6", "abv": "12", "og": "", "fg": "1.000", "yeast": "71B",
-            "yeast_g": "", "demand": "medium", "additions": "4"}
+            "demand": "medium", "additions": "4"}
 # a blank here has no meaning, so it falls back to the default; a blank
-# abv / og / yeast_g does mean something (set by OG; default pitch rate)
+# abv or og does mean something (strength set the other way)
 BLANK_IS_DEFAULT = ("gal", "fg", "demand", "additions", "yeast")
 
 # The page's only script: when a target changes, submit the same GET the
@@ -52,23 +52,12 @@ def inputs_from(params):
 
 def plan_from(inp):
     return calc.plan(inp["gal"], inp["abv"], inp["og"], inp["fg"],
-                     inp["yeast_g"], inp["yeast"], inp["demand"], "fermaid-o",
+                     inp["yeast"], inp["demand"], "fermaid-o",
                      inp["additions"])
 
 
 def targets_card(inp, p=None):
-    """Card 1. `p` (a plan) drives the yeast hint; None while input is bad."""
-    if p is None:
-        yeast_hint = "Blank = 1 g per gallon. Type what you'll actually pitch."
-    elif p["high_og_pitch"]:
-        yeast_hint = (f"1 g/gal says {num(p['yeast_default_g'], 1)} g. This "
-                      f"must is over {calc.HIGH_OG_PITCH_SG:.3f}, so the sachet "
-                      f"note says up to 2 g/gal "
-                      f"({num(p['yeast_default_g'] * 2, 1)} g). Type what "
-                      "you'll actually pitch.")
-    else:
-        yeast_hint = (f"Blank = 1 g per gallon ({num(p['yeast_default_g'], 1)} "
-                      "g). Type what you'll actually pitch.")
+    """Card 1: the two numbers, the strain, and the rarely-touched rest."""
     by_og = bool(str(inp["og"]).strip())
     abv_hint = ("Strength is set by the OG below; clear that to set ABV instead."
                 if by_og else
@@ -88,10 +77,8 @@ def targets_card(inp, p=None):
 <div class="grid">
 <span>{field("gal", "Batch volume (gal)", inp["gal"], "Your carboys: 5, 6, 6.8.")}</span>
 <span>{field("abv", "Target strength (% ABV)", inp["abv"], abv_hint)}</span>
-<span>{field("yeast", "Yeast", inp["yeast"], "The strain sets the tolerance warning.", typ="text", attrs='list="yeasts"')}
+<span>{field("yeast", "Yeast", inp["yeast"], "The strain sets the tolerance warning. Grams are worked out below, in whole sachets.", typ="text", attrs='list="yeasts"')}
 <datalist id="yeasts">{yeast_list}</datalist></span>
-<span>{field("yeast_g", "Yeast (g)", inp["yeast_g"], yeast_hint,
-             attrs=f'placeholder="{num(p["yeast_default_g"], 1) if p else ""}"')}</span>
 </div>
 {more}
 <button>Recompute</button>

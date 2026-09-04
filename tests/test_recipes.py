@@ -15,7 +15,7 @@ from brew.store import Store, slugify
 from brew.views_design import SCRIPT
 
 OWNER = {"gal": "6", "abv": "14", "og": "", "fg": "1.000", "yeast": "71B",
-         "yeast_g": "10", "demand": "medium", "additions": "4",
+         "demand": "medium", "additions": "4",
          "name": "Orange Blossom Traditional", "honey": "orange blossom",
          "notes": ""}
 
@@ -58,7 +58,7 @@ class SaveTest(RecipeTestCase):
         self.assertEqual(doc["name"], "Orange Blossom Traditional")
         self.assertEqual(doc["honey"], "orange blossom")
         self.assertEqual(doc["yeast"], "71B")
-        self.assertEqual(doc["yeast_g"], 10.0)
+        self.assertNotIn("yeast_g", doc)          # derived, not stored
         self.assertEqual(doc["design_gal"], 6.0)
         self.assertEqual(doc["strength"], {"by": "abv", "abv": 14.0,
                                            "og": None, "fg": 1.0})
@@ -67,12 +67,13 @@ class SaveTest(RecipeTestCase):
         self.assertNotIn("honey_lb", top)
         self.assertNotIn("og", top)
         c = doc["computed"]
+        self.assertEqual(c["yeast_g"], 10.0)
         self.assertEqual(c["honey_lb"], 18.29)
         self.assertEqual(c["og"], 1.1067)
         self.assertEqual(c["water_gal"], 4.48)
         self.assertEqual(c["yan_ppm"], 175)
         # ...and it is exactly what a fresh plan() from the inputs says
-        p = calc.plan(6, 14, yeast_g=10)
+        p = calc.plan(6, 14)
         for k, v in c.items():
             self.assertEqual(v, p[k], k)
         # written stably: sorted keys, indented, trailing newline
@@ -144,7 +145,7 @@ class PagesTest(RecipeTestCase):
         self.post("/recipes", OWNER)
         r = self.get("/recipes/orange-blossom-traditional", {"gal": "5"})
         self.assertIn("15.24 lb", r.body)
-        self.assertIn("8.3 g 71B", r.body)        # 10 g at 6 gal, scaled
+        self.assertIn("10 g 71B", r.body)         # 5 gal over 1.100: 2 sachets
         self.assertIn("At 5 gal you", r.body)
 
     def test_unknown_recipe_is_a_banner(self):
@@ -157,14 +158,14 @@ class PagesTest(RecipeTestCase):
         r = self.get("/", {"recipe": "orange-blossom-traditional"})
         self.assertIn("Redesign Orange Blossom Traditional", r.body)
         self.assertIn('name="abv" type="number" value="14"', r.body)
-        self.assertIn('name="yeast_g" type="number" value="10"', r.body)
+        self.assertIn('name="yeast" type="text" value="71B"', r.body)
         self.assertIn('name="from_slug" value="orange-blossom-traditional"',
                       r.body)
         self.assertIn("Save changes to Orange Blossom Traditional", r.body)
         self.assertIn('value="orange blossom"', r.body)
 
     def test_design_page_is_one_form_so_a_recompute_keeps_the_name(self):
-        r = self.get("/", {"gal": "6", "abv": "14", "yeast_g": "10",
+        r = self.get("/", {"gal": "6", "abv": "14",
                            "name": "Orange Blossom Traditional",
                            "honey": "orange blossom", "notes": "keep"})
         body = r.body

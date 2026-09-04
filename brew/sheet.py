@@ -50,8 +50,11 @@ def rows(p):
          f"{num(p['gal'])} − {num(p['honey_gal'])}; the mark is the truth, "
          "this is where to start"),
         ("Yeast", value(f"{num(p['yeast_g'], 1)} g {p['strain']}",
-                        f"({num(p['sachets'], 1)} sachets)"),
-         f"a sachet is {num(calc.YEAST_PACKET_G)} g"),
+                        f"({p['sachets']} sachet{'s' if p['sachets'] != 1 else ''})"),
+         f"{num(p['yeast_rate'], 1)} g per gal"
+         + (f" above {calc.HIGH_OG_PITCH_SG:.3f}" if p["high_og_pitch"] else "")
+         + f" = {num(p['yeast_by_rule'], 1)} g, to the nearest "
+         f"{num(calc.YEAST_PACKET_G)} g sachet"),
         ("Go-Ferm", f"{num(p['goferm_g'], 1)} g in {p['goferm_water_ml']} mL "
                     f"water at {calc.REHYDRATE_F} °F",
          f"{calc.GOFERM_G_PER_G_YEAST} g per g of yeast; "

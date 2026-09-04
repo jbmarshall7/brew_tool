@@ -20,13 +20,15 @@
     "nutrient_g": 26.2,
     "og": 1.1067,
     "per_addition_g": 6.6,
+    "sachets": 2,
     "third_break_sg": 1.071,
     "warnings": [
       "71B is rated about 14 %. A 14 % target leaves it no margin — good nutrients and a cool cellar get it there, and it may finish a touch sweet. 13 % is comfortable."
     ],
     "water_gal": 4.48,
     "water_l": 17.0,
-    "yan_ppm": 175
+    "yan_ppm": 175,
+    "yeast_g": 10.0
   },
   "demand": "medium",
   "design_gal": 6.0,
@@ -42,6 +44,5 @@
     "og": null
   },
   "updated": "2026-09-03",
-  "yeast": "71B",
-  "yeast_g": 10.0
+  "yeast": "71B"
 }

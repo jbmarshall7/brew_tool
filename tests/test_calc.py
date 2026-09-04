@@ -60,6 +60,22 @@ class HoneyWaterTest(unittest.TestCase):
 
 
 class YeastNutrientTest(unittest.TestCase):
+    def test_yeast_in_whole_sachets(self):
+        # 6 gal over 1.100: 2 g/gal = 12 g -> 2.4 sachets -> 2 -> 10 g
+        y = c.yeast_for(6, 1.1067)
+        self.assertEqual((y["rate"], y["by_rule"], y["sachets"], y["g"]),
+                         (2.0, 12.0, 2, 10.0))
+        # 5 gal at 12 %: 5 g -> one sachet, as the packet says
+        self.assertEqual(c.yeast_for(5, 1.091)["g"], 5.0)
+        # 6 gal at 12 %: 6 g -> 1.2 -> one sachet (a sachet covers 23 L)
+        self.assertEqual(c.yeast_for(6, 1.091)["sachets"], 1)
+        # 6.8 gal over 1.100: 13.6 g -> 2.72 -> 3 sachets, 15 g
+        self.assertEqual(c.yeast_for(6.8, 1.1067)["g"], 15.0)
+        # halves round up: 6.25 gal over 1.100 = 12.5 g -> 3 sachets
+        self.assertEqual(c.yeast_for(6.25, 1.1067)["sachets"], 3)
+        # never fewer than one
+        self.assertEqual(c.yeast_for(1, 1.050)["g"], 5.0)
+
     def test_yeast_and_goferm(self):
         self.assertEqual(c.yeast_grams(6), 6.0)
         self.assertEqual(c.sachets(10), 2.0)
@@ -180,7 +196,7 @@ class ScheduleTest(unittest.TestCase):
 
 class PlanTest(unittest.TestCase):
     def test_the_owners_batch(self):
-        p = c.plan(6, 14, yeast_g=10)
+        p = c.plan(6, 14)
         self.assertEqual(p["strength_by"], "abv")
         self.assertEqual(p["og"], 1.1067)
         self.assertEqual(p["honey_lb"], 18.29)
@@ -188,8 +204,8 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(p["honey_gal"], 1.52)
         self.assertEqual(p["water_gal"], 4.48)
         self.assertEqual(p["water_l"], 17.0)
-        self.assertEqual(p["yeast_g"], 10.0)
-        self.assertEqual(p["sachets"], 2.0)
+        self.assertEqual(p["yeast_g"], 10.0)         # 2 sachets, by rule
+        self.assertEqual(p["sachets"], 2)
         self.assertTrue(p["high_og_pitch"])
         self.assertEqual((p["goferm_g"], p["goferm_water_ml"]), (12.5, 250))
         self.assertEqual(p["yan_ppm"], 175)
@@ -201,8 +217,8 @@ class PlanTest(unittest.TestCase):
         self.assertIn("71B", p["warnings"][0])
 
     def test_by_og_gives_the_same_sheet(self):
-        by_abv = c.plan(6, 14, yeast_g=10)
-        by_og = c.plan(6, og=1.1067, yeast_g=10)
+        by_abv = c.plan(6, 14)
+        by_og = c.plan(6, og=1.1067)
         self.assertEqual(by_og["strength_by"], "og")
         for key in ("honey_lb", "water_gal", "yan_ppm", "nutrient_g",
                     "per_addition_g", "third_break_sg", "abv_if_dry"):
@@ -211,7 +227,7 @@ class PlanTest(unittest.TestCase):
     def test_finish_gravity_above_dry(self):
         # og = 1.010 + 14/131.25 = 1.1167; honey 116.7*6/35 = 20.01 lb;
         # third break 1.1167 - 0.1067/3 = 1.081
-        p = c.plan(6, 14, fg=1.010, yeast_g=10)
+        p = c.plan(6, 14, fg=1.010)
         self.assertEqual((p["og"], p["honey_lb"], p["water_gal"],
                           p["third_break_sg"], p["abv_if_dry"], p["yan_ppm"]),
                          (1.1167, 20.01, 4.33, 1.081, 14.0, 175))
@@ -221,7 +237,8 @@ class PlanTest(unittest.TestCase):
 
     def test_defaults(self):
         p = c.plan("6", "12")
-        self.assertEqual(p["yeast_g"], 6.0)
+        self.assertEqual(p["yeast_g"], 5.0)          # one sachet
+        self.assertEqual((p["goferm_g"], p["goferm_water_ml"]), (6.2, 124))
         self.assertFalse(p["high_og_pitch"])
         self.assertEqual(p["warnings"], [])
         self.assertEqual(p["additions"], 4)

@@ -11,9 +11,9 @@ from .store import slugify
 from .views_design import DEFAULTS, inputs_from, plan_from
 
 # the plan keys that are inputs, not results — everything else is `computed`
-INPUT_KEYS = {"strength_by", "gal", "fg", "yeast_g", "strain", "demand",
-              "product", "additions", "yeast_default_g", "high_og_pitch",
-              "feed_rows", "sachets", "target_pts"}
+INPUT_KEYS = {"strength_by", "gal", "fg", "strain", "demand", "product",
+              "additions", "high_og_pitch", "feed_rows", "target_pts",
+              "yeast_rate", "yeast_by_rule"}
 
 
 def computed_from(p):
@@ -32,7 +32,7 @@ def recipe_from_form(f):
     return {
         "slug": slugify(name), "name": name,
         "honey": (f.get("honey") or "").strip(),
-        "yeast": p["strain"], "yeast_g": p["yeast_g"],
+        "yeast": p["strain"],
         "strength": {"by": by,
                      "abv": p["abv"] if by == "abv" else None,
                      "og": p["og"] if by == "og" else None,
@@ -53,18 +53,14 @@ def inputs_from_recipe(r):
             "og": f"{s['og']:.4f}" if s.get("by") == "og" and s.get("og") else "",
             "fg": f"{s.get('fg', 1.0):.3f}",
             "yeast": r.get("yeast") or DEFAULTS["yeast"],
-            "yeast_g": num(r.get("yeast_g"), 1),
             "demand": r.get("demand") or "medium",
             "additions": str(r.get("additions") or 4)}
 
 
 def plan_for(r, gal):
-    """The recipe scaled to `gal`; yeast grams scale with the volume."""
+    """The recipe at `gal`: same targets, everything else re-derived."""
     inp = inputs_from_recipe(r)
-    design_gal = r.get("design_gal") or float(inp["gal"])
-    scale = float(gal) / design_gal if design_gal else 1.0
     inp["gal"] = str(gal)
-    inp["yeast_g"] = num(round((r.get("yeast_g") or 0) * scale, 1), 1)
     return plan_from(inp)
 
 
@@ -164,8 +160,8 @@ def recipe(req):
          f"FG {sg(p['fg'])}"),
         ("Honey", r.get("honey") or "—",
          f"{num(p['honey_lb_per_gal'])} lb per gallon"),
-        ("Yeast", f"{num(r.get('yeast_g'), 1)} g {r.get('yeast')} "
-                  f"at {num(r.get('design_gal'))} gal", None),
+        ("Yeast", f"{r.get('yeast') or '—'}",
+         f"{num(p['yeast_g'], 1)} g at {num(p['gal'])} gal, whole sachets"),
         ("Nutrients", f"{product_name(r.get('product'))} × "
                       f"{r.get('additions')}, {r.get('demand')} demand", None),
     ])

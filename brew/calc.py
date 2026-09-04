@@ -32,6 +32,7 @@ GOFERM_G_PER_G_YEAST = 1.25      # Lallemand: 1.25 g Go-Ferm per 1 g dry yeast
 GOFERM_WATER_ML_PER_G = 20.0     # Lallemand: 20 mL water per g Go-Ferm
 REHYDRATE_F = 104                # Lallemand rehydration temperature
 HIGH_OG_PITCH_SG = 1.100         # above this the sachet note says up to 2 g/gal
+YEAST_HIGH_OG_RATE = 2.0         # g/gal above HIGH_OG_PITCH_SG
 TOSNA_ADDITIONS = 4
 TOSNA_HOURS = (24, 48, 72)       # additions 1-3, hours after pitch
 TOSNA_LAST_DAY = 7               # the last addition's cap, days after pitch
@@ -132,6 +133,23 @@ def yeast_grams(gallons, rate=YEAST_G_PER_GAL["dry standard"]):
 
 def sachets(grams):
     return round(grams / YEAST_PACKET_G, 1)
+
+
+def yeast_for(gallons, og):
+    """Dry yeast to pitch, in whole sachets.
+
+    1 g per gallon, 2 g per gallon once the must is over 1.100, to the
+    nearest 5 g sachet — halves round up, because underpitching is the
+    failure mode — and never fewer than one. This is how a packet is
+    actually used: 6 gal at 14 % is 12 g by the rule, so two sachets, 10 g;
+    5 gal at 12 % is one sachet, which is what the packet itself says.
+    """
+    rate = (YEAST_HIGH_OG_RATE if og > HIGH_OG_PITCH_SG
+            else YEAST_G_PER_GAL["dry standard"])
+    by_rule = gallons * rate
+    n = max(1, int(by_rule / YEAST_PACKET_G + 0.5))
+    return {"rate": rate, "by_rule": round(by_rule, 1), "sachets": n,
+            "g": round(n * YEAST_PACKET_G, 1)}
 
 
 def goferm(yeast_g):
@@ -322,13 +340,14 @@ def schedule(pitched_at, og, fg, gallons, demand="medium", product="fermaid-o",
 
 
 # --- the whole plan ---------------------------------------------------------
-def plan(gal, abv_target=None, og=None, fg=1.0, yeast_g=None, strain="71B",
+def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
          demand="medium", product="fermaid-o", additions=TOSNA_ADDITIONS,
          ppg=PPG_PER_LB_HONEY):
     """Everything the bench needs for `gal` of must at a target strength.
 
     Strength is set by ABV (the usual way) or by OG; whichever is given wins
-    and the other is derived. Raises ValueError in a cellar voice on nonsense.
+    and the other is derived. Yeast is whole sachets from the volume and the
+    OG (see yeast_for). Raises ValueError in a cellar voice on nonsense.
     """
     gal = num(gal, "batch volume", 0.1, 1000, " gal")
     fg = 1.0 if blank(fg) else num(fg, "finish FG", 0.950, 1.100)
@@ -352,10 +371,8 @@ def plan(gal, abv_target=None, og=None, fg=1.0, yeast_g=None, strain="71B",
         raise ValueError(f"nutrient '{product}' isn't one of "
                          f"{', '.join(YAN_PPM_PER_G_PER_GAL)}")
     n = int(num(additions, "nutrient additions", 1, 8))
-    default_yeast = yeast_grams(gal)
-    yeast = default_yeast if blank(yeast_g) else num(yeast_g, "yeast", 0.1,
-                                                     500, " g")
-    yeast = round(yeast, 1)
+    y = yeast_for(gal, og)
+    yeast = y["g"]
     strain = (strain or "").strip() or "71B"
 
     honey_lb = honey_for_og(gal, og, ppg)
@@ -376,8 +393,8 @@ def plan(gal, abv_target=None, og=None, fg=1.0, yeast_g=None, strain="71B",
         "fg": fg, "target_pts": round(points(og), 1),
         "honey_lb": honey_lb, "honey_lb_per_gal": round(honey_lb / gal, 2),
         "honey_gal": hg, "water_gal": wg, "water_l": round(wg * L_PER_GAL, 1),
-        "yeast_g": yeast, "yeast_default_g": default_yeast,
-        "sachets": sachets(yeast), "strain": strain,
+        "yeast_g": yeast, "sachets": y["sachets"], "yeast_rate": y["rate"],
+        "yeast_by_rule": y["by_rule"], "strain": strain,
         "high_og_pitch": og > HIGH_OG_PITCH_SG,
         "goferm_g": gf_g, "goferm_water_ml": gf_ml,
         "demand": demand, "product": product, "additions": n,
