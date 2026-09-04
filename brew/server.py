@@ -10,20 +10,24 @@ import sys
 import traceback
 from collections import namedtuple
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 
 from . import html
+
+STATIC = Path(__file__).resolve().parent / "static"
 
 Request = namedtuple("Request", "method path params form args store")
 
 
 class Response:
     def __init__(self, body="", status=200, location=None,
-                 content_type="text/html; charset=utf-8"):
+                 content_type="text/html; charset=utf-8", cache=None):
         self.body = body
         self.status = status
         self.location = location
         self.content_type = content_type
+        self.cache = cache          # Cache-Control, for the font files
 
 
 ROUTES = []       # (method, compiled pattern, view)
@@ -123,10 +127,13 @@ class Handler(BaseHTTPRequestHandler):
             resp = Response(html.page("Error", "<p>Something went wrong on "
                                       "the server — the details are in the "
                                       "terminal it runs in.</p>", "/"), 500)
-        body = resp.body.encode()
+        body = (resp.body if isinstance(resp.body, bytes)
+                else resp.body.encode())
         self.send_response(resp.status)
         if resp.location:
             self.send_header("Location", resp.location)
+        if resp.cache:
+            self.send_header("Cache-Control", resp.cache)
         self.send_header("Content-Type", resp.content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -142,6 +149,32 @@ class Handler(BaseHTTPRequestHandler):
 def make_server(store=None, host="127.0.0.1", port=8765):
     handler = type("BoundHandler", (Handler,), {"store": store})
     return ThreadingHTTPServer((host, port), handler)
+
+
+# --- the vendored display faces --------------------------------------------
+# Served from the app itself so the cellar keeps its typography with no wifi.
+# Two files, one route each, immutable — the only static surface there is.
+FONT_CSS = """
+@font-face { font-family:"Caprasimo"; font-style:normal; font-weight:400;
+  font-display:swap; src:url(/static/caprasimo-400.woff2) format("woff2"); }
+@font-face { font-family:"Figtree"; font-style:normal; font-weight:400 700;
+  font-display:swap; src:url(/static/figtree.woff2) format("woff2"); }
+"""
+
+
+@route("GET", "/fonts.css")
+def fonts_css(req):
+    return Response(FONT_CSS, content_type="text/css; charset=utf-8",
+                    cache="max-age=31536000, immutable")
+
+
+@route("GET", r"/static/([a-z0-9-]+\.woff2)")
+def static_font(req):
+    path = STATIC / req.args[0]
+    if not path.exists():
+        return Response("not found", 404, content_type="text/plain")
+    return Response(path.read_bytes(), content_type="font/woff2",
+                    cache="max-age=31536000, immutable")
 
 
 # --- views register their routes on import ---------------------------------

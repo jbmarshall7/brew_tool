@@ -6,6 +6,21 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-04 — the Organic look, from `design_handoff_brew_tool_ui/`.**
+  Warm cream ground, terracotta accent, sage second voice, Caprasimo over
+  Figtree, pill controls and soft-shadowed cards. The Design page is two
+  columns (targets and save left, bench sheet right), the strain is a row of
+  pill radios and nitrogen demand a segmented control, the sheet's target OG
+  reads as a tag beside its heading, and must day is one card — the five
+  floor-order steps and the hydrometer check together, the check panel always
+  open. Both display faces are vendored under `brew/static/` and served by the
+  app, so the cellar keeps its typography with no wifi. §7 still holds: the
+  only script is the Design page's auto-submit, and no arithmetic is in the
+  browser. **Still out of scope**, per §9 and the handoff's own warning: the
+  Today dashboard, the reading ledger, the gravity curve and the feed
+  tick-boxes all need `readings[]` on the batch file.
+
+
 - **2026-09-04 — yeast is derived, not typed.** The owner asked why yeast
   grams were an input at all. They now come from the volume and the OG in
   whole sachets: 1 g/gal, 2 g/gal above 1.100, to the nearest 5 g sachet

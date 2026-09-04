@@ -4,7 +4,7 @@ One renderer, reused by the Design page, the recipe page and the must page,
 so the numbers and their stated assumptions read the same everywhere.
 """
 from . import calc
-from .html import banner, esc, gal_l, kv, lb_oz, num, raw, sg
+from .html import banner, esc, gal_l, kv, lb_oz, num, pill, raw, sg
 
 PRODUCT_NAMES = {"fermaid-o": "Fermaid O", "fermaid-k": "Fermaid K",
                  "dap": "DAP"}
@@ -76,6 +76,11 @@ def rows(p):
 
 
 def render_sheet(p, title=None):
-    head = f"<h2>{esc(title)}</h2>" if title else ""
+    head = ""
+    if title:
+        # the target OG reads as a tag beside the heading, so the sheet's
+        # headline number is visible before you scan the rows
+        head = (f'<div class="sheet-head"><h2>{esc(title)}</h2>'
+                f'{pill("OG " + sg(p["og"]))}</div>')
     warn = "".join(banner(w, "warn") for w in p["warnings"])
     return f'<div class="card">{head}{kv(rows(p))}</div>{warn}'

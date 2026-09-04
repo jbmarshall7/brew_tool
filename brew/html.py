@@ -4,116 +4,267 @@ Server-rendered, one stylesheet inlined into every page (there is no static
 route to get wrong), escaped by default: every value goes through `esc`
 unless it is wrapped in `raw`, and `raw` is only for markup this module or
 a view built itself.
+
+The look is the Organic design system from design_handoff_brew_tool_ui:
+warm cream ground, terracotta accent, sage second voice, Caprasimo display
+face over Figtree body, pill controls and soft-shadowed cards. Every number
+on screen is still rendered server-side from calc.py — no arithmetic ever
+moves into the browser.
 """
 from html import escape as _escape
 
+# Caprasimo (headings) over Figtree (body), served from the app itself so
+# the cellar laptop keeps the design offline. The stacks still fall back to
+# Georgia/system-ui if a face fails to load.
+FONTS = ('<link rel="stylesheet" href="/fonts.css?v=1">')
+
+# A warbler mark for the header bar — the handoff's placeholder, inline so
+# there is still almost no static surface. Swap in the real logo when there
+# is one.
+BRAND_MARK = (
+    '<svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">'
+    '<circle cx="16" cy="16" r="16" fill="#c67139"></circle>'
+    '<path d="M22.5 11.2c-1.6-.6-3.2-.2-4.4.9-1.1 1-1.7 2.4-2.8 3.3-1.1.9-2.6'
+    ' 1.2-3.9.9-.5-.1-.8.5-.4.8 1.2 1 1.6 2.6 1.1 4-.6 1.6-2.2 2.7-3.9 2.7'
+    ' 2.6 1.4 5.9 1.1 8.4-.6 2.4-1.6 4-4.3 4.6-7.1l2.4-1.6c.3-.2.3-.7-.1-.8'
+    'l-1.1-.4c.2-.7.5-1.4.9-2 .2-.4-.2-.8-.6-.6-.6.3-1.1.7-1.5 1.2z"'
+    ' fill="#f5ead8"></path>'
+    '<circle cx="19.2" cy="13.6" r="1" fill="#201e1d"></circle></svg>')
+
 CSS = """
-:root { --bg:#f6f3ec; --card:#fffdf8; --ink:#2c2620; --mut:#8a7f70;
-        --line:#e6dfd2; --accent:#8c6d1f; --accent-dk:#6f5518;
-        --ok:#3a7d44; --err:#a63d2f; --warn:#b07d2b; --head:#332b23; }
+:root {
+  /* Organic tokens — the ground, the ink, and two accents with their ramps */
+  --bg:#f5ead8; --surface:#ebddc5; --card:#fff2eb; --ink:#201e1d;
+  --mut:#645c50; --line:rgba(32,30,29,.16); --rule:rgba(32,30,29,.08);
+  --accent:#c67139; --accent-600:#b2622d; --accent-700:#8c491a;
+  --accent-100:#fff2eb; --accent-200:#ffe1d0; --accent-800:#643312;
+  --sage:#7a8a5e; --sage-100:#f0fae1; --sage-200:#e1eecc;
+  --sage-700:#56633f; --sage-800:#3d472b;
+  --ok:#56633f; --err:#8c491a; --warn:#b2622d; --head:#ebddc5;
+  --neutral-100:#f9f4ed; --neutral-800:#474238;
+  --font-head:"Caprasimo",Georgia,serif;
+  --font-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r-card:28px; --r-inner:22px; --shadow:0 1px 2px rgba(46,43,37,.14);
+}
 * { box-sizing:border-box; }
-body { margin:0; font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
-       background:var(--bg); color:var(--ink); }
-header { background:var(--head); color:#f3ead9; padding:10px 20px;
-         display:flex; align-items:baseline; gap:20px; flex-wrap:wrap; }
-header .brand { font-weight:700; letter-spacing:.3px; }
-header nav { display:flex; gap:18px; }
-header nav a { color:#d9c89a; text-decoration:none; padding:6px 0;
-               min-height:40px; display:inline-flex; align-items:center; }
-header nav a:hover { color:#fff; }
-header nav a.active { color:#fff; box-shadow:inset 0 -2px 0 var(--accent); }
-main { max-width:860px; margin:0 auto; padding:18px 20px 80px; }
-h1 { font-size:22px; margin:12px 0 10px; }
-h2 { font-size:15px; margin:26px 0 8px; padding-bottom:4px;
-     border-bottom:1px solid var(--line); }
-a { color:var(--accent); }
-.card { background:var(--card); border:1px solid var(--line); border-radius:8px;
-        padding:14px 18px; margin:10px 0; }
-.card h2:first-child { margin-top:2px; }
-.kv { display:grid; grid-template-columns:150px 1fr; gap:4px 14px;
-      padding:9px 0; border-bottom:1px dashed var(--line); align-items:baseline; }
+body { margin:0; font:16px/1.55 var(--font-body); background:var(--bg);
+       color:var(--ink); }
+h1,h2,h3 { font-family:var(--font-head); font-weight:400; line-height:1.12;
+           letter-spacing:-.015em; }
+
+/* — header: a cream bar, not a dark one; the current link is underlined — */
+header { background:var(--head); color:var(--ink); padding:14px 26px;
+         display:flex; align-items:center; gap:22px; flex-wrap:wrap;
+         border-bottom:1px solid var(--line); }
+header .brand { font-family:var(--font-head); font-size:19px;
+                display:inline-flex; align-items:center; gap:11px;
+                margin-right:auto; }
+header .brand svg { display:block; }
+header nav { display:flex; gap:20px; }
+header nav a { color:var(--ink); text-decoration:none; font-size:15px;
+               min-height:44px; display:inline-flex; align-items:center;
+               border-bottom:2px solid transparent; }
+header nav a:hover { color:var(--accent-700); }
+header nav a.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+main { max-width:980px; margin:0 auto; padding:26px 26px 90px; }
+h1 { font-size:38px; margin:10px 0 6px; }
+h2 { font-size:23px; margin:30px 0 10px; padding-bottom:0; border:none; }
+a { color:var(--accent-700); text-underline-offset:3px; }
+a:hover { color:var(--accent); }
+::selection { background:rgba(198,113,57,.3); }
+:focus { outline:none; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+/* the one-line answer to "what is this page for", under the title */
+p.lede { max-width:660px; font-size:15px; color:var(--mut); margin:0 0 4px; }
+
+/* — cards, kv rows — */
+.card { background:var(--card); border:none; border-radius:var(--r-card);
+        padding:22px 26px; margin:16px 0; box-shadow:var(--shadow); }
+.card h2:first-child { margin-top:0; }
+.kv { display:grid; grid-template-columns:158px 1fr; gap:3px 20px;
+      padding:11px 0; border-bottom:1px solid var(--rule);
+      align-items:baseline; }
 .kv:last-child { border-bottom:none; }
-.kv b { color:var(--mut); font-weight:600; font-size:12.5px;
-        text-transform:uppercase; letter-spacing:.3px; padding-top:4px; }
-.kv .v { font-size:19px; font-weight:600; }
-.kv .v small { font-size:14px; font-weight:400; color:var(--mut); }
-.kv .n { grid-column:2; color:var(--mut); font-size:13px; }
-.pill { display:inline-block; padding:2px 10px; border-radius:11px; font-size:12px;
-        font-weight:600; background:#ece2cf; color:#6d5b34; vertical-align:middle; }
-.pill.ok { background:#dcecdf; color:var(--ok); }
-.pill.warn { background:#f6dcd0; color:var(--err); }
-.tw { overflow-x:auto; margin:8px 0; }
-table { border-collapse:collapse; width:100%; background:var(--card);
-        border:1px solid var(--line); border-radius:8px; font-size:15px; }
-th,td { text-align:left; padding:8px 11px; border-bottom:1px solid var(--line);
-        vertical-align:top; }
-th { background:#efe9dc; font-size:12px; text-transform:uppercase;
-     letter-spacing:.5px; color:#6d6152; }
+.kv b { color:var(--mut); font-weight:400; font-size:13.5px;
+        text-transform:none; letter-spacing:0; padding-top:4px; }
+.kv .v { font-family:var(--font-head); font-weight:400; font-size:20px;
+         line-height:1.25; }
+.kv .v small { font-family:var(--font-body); font-size:13px; color:var(--mut); }
+.kv .n { grid-column:2; color:var(--mut); font-size:12.5px; line-height:1.45;
+         opacity:.85; }
+
+/* — pills / tags — */
+.pill { display:inline-block; padding:4px 12px; border-radius:999px;
+        font-size:11.5px; font-weight:600; background:var(--neutral-100);
+        color:var(--neutral-800); vertical-align:middle; letter-spacing:.02em; }
+.pill.ok { background:var(--sage-100); color:var(--sage-800); }
+.pill.warn { background:var(--accent-100); color:var(--accent-800); }
+
+/* a heading with its headline number beside it */
+.sheet-head { display:flex; align-items:baseline; gap:12px; }
+.sheet-head h2 { margin:0; flex:1; }
+
+/* — tables — */
+.tw { overflow-x:auto; margin:14px 0; background:var(--card);
+      border-radius:var(--r-card); padding:8px 18px 12px;
+      box-shadow:var(--shadow); }
+table { border-collapse:collapse; width:100%; background:transparent;
+        border:none; font-size:14.5px; }
+th,td { text-align:left; padding:11px 10px; vertical-align:top; }
+th { background:transparent; font-size:11px; text-transform:uppercase;
+     letter-spacing:.08em; color:var(--mut);
+     border-bottom:1px solid var(--line); }
+td { border-bottom:1px solid var(--rule); }
 tr:last-child td { border-bottom:none; }
-form.inline { background:var(--card); border:1px solid var(--line);
-              border-radius:8px; padding:14px 18px; margin:8px 0; }
-.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-        gap:6px 16px; align-items:start; }
-label { display:block; font-size:13px; color:var(--mut); margin-top:10px; }
-.hint { display:block; font-size:12.5px; color:var(--mut); margin-top:3px; }
-input,select,textarea { width:100%; max-width:420px; padding:9px 11px; font:inherit;
-       font-size:17px; min-height:44px; border:1px solid #cbc1af; border-radius:5px;
-       background:#fff; color:var(--ink); }
-textarea { min-height:70px; }
-input:focus,select:focus,textarea:focus { outline:2px solid #d9c48a;
+tbody tr:hover { background:rgba(32,30,29,.04); }
+td .sub { display:block; color:var(--mut); font-size:12.5px; margin-top:2px; }
+
+/* — forms: pill inputs on the sand surface — */
+form.inline { background:var(--card); border:none; border-radius:var(--r-card);
+              padding:22px 26px; margin:14px 0; box-shadow:var(--shadow); }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+        gap:8px 20px; align-items:start; }
+label { display:block; font-size:12.5px; color:var(--mut); margin-top:14px; }
+.hint { display:block; font-size:12.5px; color:var(--mut); margin-top:5px;
+        opacity:.85; line-height:1.45; }
+input,select,textarea { width:100%; max-width:420px; padding:10px 16px;
+       font:inherit; font-size:17px; min-height:44px; border:1px solid var(--line);
+       border-radius:999px; background:var(--surface); color:var(--ink);
+       caret-color:var(--accent); }
+textarea { min-height:80px; border-radius:var(--r-inner); resize:vertical; }
+input:hover,select:hover,textarea:hover { border-color:rgba(32,30,29,.45); }
+input:focus,select:focus,textarea:focus { outline:none;
        border-color:var(--accent); }
-button { margin-top:14px; padding:10px 20px; font:inherit; font-size:16px;
-         font-weight:600; min-height:44px; background:var(--accent); color:#fff;
-         border:none; border-radius:6px; cursor:pointer; }
-button:hover { background:var(--accent-dk); }
-button.quiet { background:transparent; color:var(--accent-dk);
-               border:1px solid #cbc1af; }
-.msg { padding:12px 15px; border-radius:8px; margin:12px 0; white-space:pre-wrap;
-       font-size:15px; border:1px solid; }
-.msg.ok { background:#eaf4ec; border-color:#bcd8c2; color:#2f5d3c; }
-.msg.err { background:#f9ece9; border-color:#e0b8b0; color:var(--err); }
-.msg.warn { background:#f8f1e2; border-color:#e2cf9f; color:#7a5a1d; }
-.mut { color:var(--mut); font-size:13.5px; }
-a.btn { display:inline-flex; align-items:center; min-height:44px; padding:0 16px;
-        background:var(--accent); color:#fff; border-radius:6px; font-weight:600;
-        text-decoration:none; white-space:nowrap; }
-a.btn:hover { background:var(--accent-dk); }
-td .sub { display:block; color:var(--mut); font-size:13px; margin-top:2px; }
-.next { font-size:15px; margin:12px 0; }
+input:focus-visible,select:focus-visible,textarea:focus-visible {
+       outline:2px solid var(--accent); outline-offset:0; }
+
+button { margin-top:18px; padding:12px 24px; font-family:var(--font-head);
+         font-weight:400; font-size:15px; min-height:44px;
+         background:var(--accent); color:var(--bg); border:none;
+         border-radius:999px; cursor:pointer; }
+button:hover { background:var(--accent-600); }
+button:active { background:var(--accent-700); }
+button.quiet { background:transparent; color:var(--ink);
+               border:1px solid var(--line); }
+button.quiet:hover { background:rgba(32,30,29,.07); }
+button.block { width:100%; max-width:420px; }
+button:disabled { opacity:.45; cursor:not-allowed; }
+a.btn { display:inline-flex; align-items:center; min-height:44px; padding:0 22px;
+        background:var(--accent); color:var(--bg); border-radius:999px;
+        font-family:var(--font-head); text-decoration:none; white-space:nowrap; }
+a.btn:hover { background:var(--accent-600); color:var(--bg); }
+
+/* — pill radios (yeast) and the segmented control (nitrogen demand) — */
+.tags { display:flex; gap:6px; flex-wrap:wrap; margin-top:5px; }
+.tags label { display:inline-flex; align-items:center; margin:0;
+        cursor:pointer; padding:0 15px; min-height:44px; font-size:13.5px;
+        color:var(--neutral-800); background:var(--neutral-100);
+        border:1px solid var(--line); border-radius:999px; }
+.tags label:hover { background:rgba(32,30,29,.07); }
+.tags input { position:absolute; opacity:0; width:0; height:0;
+        pointer-events:none; }
+.tags label.on { background:var(--accent); border-color:var(--accent);
+        color:var(--bg); }
+.tags label:focus-within { outline:2px solid var(--accent); outline-offset:2px; }
+.seg { display:inline-flex; overflow:hidden; margin-top:5px;
+       border:1px solid var(--line); border-radius:999px; }
+.seg label { display:inline-flex; align-items:center; margin:0; cursor:pointer;
+       padding:0 18px; min-height:44px; font-size:13.5px; color:var(--ink); }
+.seg label + label { border-left:1px solid var(--line); }
+.seg label.on { background:var(--accent); color:var(--bg); }
+.seg label:not(.on):hover { background:rgba(32,30,29,.07); }
+.seg input { position:absolute; opacity:0; width:0; height:0;
+       pointer-events:none; }
+.seg label:focus-within { outline:2px solid var(--accent); outline-offset:-2px; }
+
+/* — the two-column working layout, and a stack of cards in one column — */
+.cols { display:grid; grid-template-columns:minmax(300px,.85fr) minmax(0,1.15fr);
+        gap:24px; align-items:start; margin-top:20px; }
+.cols > * { min-width:0; }
+.stack { display:flex; flex-direction:column; gap:18px; }
+.stack > .card, .stack > form.inline { margin:0; }
+
+/* — an inset working panel: the hydrometer check — */
+.panel { background:rgba(198,113,57,.09); border-radius:24px;
+         padding:18px 20px; margin:16px 0; }
+.panel h3 { font-size:18px; margin:0 0 4px; }
+.panel .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+.panel .row > span { flex:0 0 auto; width:150px; }
+.panel .row label { margin-top:0; }
+.panel .row input { text-align:center; }
+.panel .row button { margin-top:0; flex:none; white-space:nowrap; }
+
+/* — banners — */
+.msg { padding:15px 20px; border-radius:var(--r-inner); margin:16px 0;
+       white-space:pre-wrap; font-size:14.5px; line-height:1.55; border:none; }
+.msg.ok { background:var(--sage-200); color:var(--sage-800); }
+.msg.err { background:var(--accent-200); color:var(--accent-800); }
+.msg.warn { background:var(--accent-200); color:var(--accent-800); }
+.mut { color:var(--mut); font-size:13px; opacity:.9; }
+.next { font-size:15px; margin:16px 0; }
 .next a { font-weight:600; }
-details.sec { margin:10px 0; }
-details.sec > summary { cursor:pointer; font-size:15px; font-weight:600;
-        color:var(--accent-dk); padding:11px 14px; min-height:44px;
-        background:var(--card); border:1px solid var(--line); border-radius:8px;
-        list-style-position:inside; }
-details.sec[open] > summary { border-radius:8px 8px 0 0; }
-details.sec > form.inline, details.sec > .inner { border-radius:0 0 8px 8px;
-        margin-top:0; border-top:none; }
-.inner { background:var(--card); border:1px solid var(--line); padding:12px 18px; }
-ol.steps { list-style:none; counter-reset:step; padding:0; margin:12px 0; }
-ol.steps li { counter-increment:step; display:grid; grid-template-columns:40px 1fr;
-              gap:2px 12px; padding:12px 14px; margin:8px 0; background:var(--card);
-              border:1px solid var(--line); border-radius:8px; }
+.doit { display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+        margin-top:18px; }
+.doit button { margin-top:0; min-height:46px; padding:0 26px; }
+.doit .mut { font-size:12.5px; }
+
+/* — disclosures — */
+details.sec { margin:14px 0; }
+details.sec > summary { cursor:pointer; font-family:var(--font-head);
+        font-size:15px; color:var(--ink); padding:13px 22px; min-height:44px;
+        background:var(--card); border:none; border-radius:999px;
+        list-style-position:inside; box-shadow:var(--shadow); }
+details.sec > summary:hover { color:var(--accent-700); }
+details.sec[open] > summary { border-radius:var(--r-card) var(--r-card) 0 0; }
+details.sec > form.inline, details.sec > .inner {
+        border-radius:0 0 var(--r-card) var(--r-card); margin-top:0;
+        border-top:none; }
+.inner { background:var(--card); border:none; padding:18px 26px;
+         box-shadow:var(--shadow); }
+
+/* — the must-day steps: sage circles, bigger values — */
+ol.steps { list-style:none; counter-reset:step; padding:0; margin:18px 0 0;
+           display:flex; flex-direction:column; gap:14px; }
+ol.steps li { counter-increment:step; display:grid;
+              grid-template-columns:30px 1fr; gap:3px 14px; }
 ol.steps li::before { content:counter(step); grid-row:1 / span 3; width:30px;
-              height:30px; border-radius:50%; background:var(--accent); color:#fff;
-              font-weight:700; display:flex; align-items:center; justify-content:center; }
-ol.steps .stitle { font-size:12.5px; color:var(--mut); text-transform:uppercase;
-              letter-spacing:.3px; font-weight:600; }
-ol.steps .big { font-size:1.4em; font-weight:600; line-height:1.3; }
+              height:30px; border-radius:50%; background:var(--sage-200);
+              color:var(--sage-800); font-family:var(--font-head);
+              font-size:14px; display:flex; align-items:center;
+              justify-content:center; }
+ol.steps .stitle { font-size:13px; color:var(--mut); text-transform:uppercase;
+              letter-spacing:.06em; }
+ol.steps .big { font-family:var(--font-head); font-weight:400; font-size:21px;
+              line-height:1.25; }
+ol.steps .mut { line-height:1.5; margin-top:3px; }
+
 @media print {
   header, form, button, details, .msg.err, .noprint { display:none !important; }
-  body { background:#fff; font-size:14px; } main { max-width:none; padding:0; }
-  .card { border:none; padding:6px 0; }
+  body { background:#fff; font-size:14px; }
+  main { max-width:none; padding:0; }
+  .card, .tw, .panel { border:none; box-shadow:none; padding:6px 0;
+       border-radius:0; background:#fff; }
+  .cols { display:block; }
+  a { color:var(--ink); }
+}
+@media (max-width:860px) {
+  .cols { grid-template-columns:1fr; }
 }
 @media (max-width:640px) {
-  header { padding:8px 14px; gap:12px; }
-  main { padding:12px 12px 60px; }
-  .kv { grid-template-columns:1fr; gap:0; } .kv .n { grid-column:1; }
+  header { padding:10px 16px; gap:14px; }
+  main { padding:16px 14px 70px; }
+  h1 { font-size:30px; }
+  .card, form.inline, .inner { padding-left:18px; padding-right:18px; }
+  .kv { grid-template-columns:1fr; gap:0; }
+  .kv .n { grid-column:1; }
   .kv b { padding-top:0; }
+  .panel .row > span { width:100%; }
 }
 """
 
-NAV = [("/", "Design"), ("/recipes", "Recipes")]
+NAV = [("/", "Design & must"), ("/recipes", "Recipes")]
 
 
 class raw(str):
@@ -127,17 +278,21 @@ def esc(value):
     return _escape(str(value), quote=True)
 
 
-def page(title, body, active="/", msg=None, kind="ok", tail=""):
+def page(title, body, active="/", msg=None, kind="ok", tail="", lede=None):
     nav = "".join(
         f'<a href="{href}"{" class=active" if href == active else ""}>'
         f"{esc(label)}</a>" for href, label in NAV)
     top = banner(msg, kind) if msg else ""
+    intro = f'<p class="lede">{esc(lede)}</p>' if lede else ""
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
             f'<meta name="viewport" content="width=device-width,initial-scale=1">'
-            f"<title>{esc(title)} — brew_tool</title><style>{CSS}</style></head>"
-            f'<body><header><span class="brand">🍯 brew_tool</span>'
+            f"<title>{esc(title)} — brew_tool</title>{FONTS}"
+            f"<style>{CSS}</style></head>"
+            f'<body><header><span class="brand">{BRAND_MARK}'
+            f"Warblers Meadery</span>"
             f"<nav>{nav}</nav></header>"
-            f"<main><h1>{esc(title)}</h1>{top}{body}</main>{tail}</body></html>")
+            f"<main><h1>{esc(title)}</h1>{intro}{top}{body}</main>"
+            f"{tail}</body></html>")
 
 
 def banner(text, kind="ok"):
@@ -216,6 +371,35 @@ def textarea(name, label, value="", hint=None, id_=None):
             f'<textarea id="{esc(fid)}" name="{esc(name)}">{esc(value or "")}'
             "</textarea>"
             + (f'<span class="hint">{esc(hint)}</span>' if hint else ""))
+
+
+def tag_radios(name, label, options, value, hint=None):
+    """A row of pill radios — the design's yeast picker. Changing one
+    submits the form, so the sheet recomputes the way a typed field does."""
+    pills = "".join(
+        f'<label class="{"on" if v == value else ""}">'
+        f'<input type="radio" name="{esc(name)}" value="{esc(v)}"'
+        f'{" checked" if v == value else ""}>{esc(lbl)}</label>'
+        for v, lbl in options)
+    return (f'<label>{esc(label)}</label><div class="tags">{pills}</div>'
+            + (f'<span class="hint">{esc(hint)}</span>' if hint else ""))
+
+
+def seg_control(name, label, options, value, hint=None):
+    """A segmented control — one of three, all visible at once."""
+    segs = "".join(
+        f'<label class="{"on" if v == value else ""}">'
+        f'<input type="radio" name="{esc(name)}" value="{esc(v)}"'
+        f'{" checked" if v == value else ""}>{esc(lbl)}</label>'
+        for v, lbl in options)
+    return (f'<label>{esc(label)}</label><div class="seg">{segs}</div>'
+            + (f'<span class="hint">{esc(hint)}</span>' if hint else ""))
+
+
+def panel(inner, title=None):
+    """An inset working panel on the accent tint (the hydrometer check)."""
+    head = f"<h3>{esc(title)}</h3>" if title else ""
+    return f'<div class="panel">{head}{inner}</div>'
 
 
 def hidden(name, value):

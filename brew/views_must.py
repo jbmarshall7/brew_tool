@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 
 from . import calc
 from .html import (banner, card, details, esc, field, gal_l, hidden, kv,
-                   lb_oz, num, page as _page, sg, textarea)
+                   lb_oz, num, page as _page, pill, sg, textarea)
 from .server import Response, redirect, route
 from .sheet import feed_when, product_name
 from .views_recipes import plan_for
@@ -139,7 +139,10 @@ def check(p, params):
     return "\n".join(lines), kind, og, c
 
 
-def read_form(slug, p, params, checked, correction=None):
+def read_form(slug, p, params, checked, correction=None, verdict=None,
+              vkind="ok"):
+    """The design's inset check panel: one row of small fields, the verdict
+    beneath it, and a reminder that none of it writes anything."""
     cal_f = params.get("cal_f") or str(DEFAULT_CAL_F)
     now_gal = params.get("now_gal") or num(p["gal"])
     if correction and correction.get("add") == "water":
@@ -148,23 +151,29 @@ def read_form(slug, p, params, checked, correction=None):
     else:
         now_hint = ("Only matters if you diluted or came up short of the "
                     "mark.")
-    more_open = (params.get("cal_f") not in (None, "", str(DEFAULT_CAL_F))
-                 or (params.get("now_gal") not in (None, "")
-                     and params.get("now_gal") != num(p["gal"]))
-                 or bool(correction and correction.get("add") == "water"))
-    more = details("Hydrometer calibration and volume now", f"""<div class="inner"><div class="grid">
-<span>{field("cal_f", "Hydrometer calibrated at (°F)", cal_f, "Printed on the hydrometer; 60 °F is common, some are 68 °F.")}</span>
-<span>{field("now_gal", "Volume in the carboy now (gal)", now_gal, now_hint)}</span>
-</div></div>""", open_=more_open)
-    return f"""<form class="inline" method="get" action="/recipes/{esc(slug)}/must" id="read">
-{hidden("gal", num(p["gal"]))}
-<div class="grid">
-<span>{field("reading", "Hydrometer reading", params.get("reading", ""), "What the glass says, e.g. 1.101.", step="0.001")}</span>
-<span>{field("temp_f", "Sample temperature (°F)", params.get("temp_f", ""), "Blank = at the hydrometer's calibration temperature.")}</span>
-<span>{field("ph", "pH", params.get("ph", ""), "Optional; the meter's number.", step="0.01")}</span>
-</div>
-{more}
-<button>{"Check again" if checked else "Check"}</button></form>"""
+    row = "".join(
+        f'<span style="width:{w}px">{f}</span>' for w, f in (
+            (130, field("reading", "Hydrometer", params.get("reading", ""),
+                        None, step="0.001", attrs='placeholder="1.101"')),
+            (112, field("temp_f", "Sample °F", params.get("temp_f", ""),
+                        None, attrs='placeholder="76"')),
+            (96, field("ph", "pH", params.get("ph", ""), None, step="0.01",
+                       attrs='placeholder="3.9"')),
+            (132, field("cal_f", "Hydrometer cal. °F", cal_f)),
+        ))
+    inner = (f'<h3>Read it — before the yeast goes in</h3>'
+             f'<form class="row" method="get" '
+             f'action="/recipes/{esc(slug)}/must" id="read">'
+             f'{hidden("gal", num(p["gal"]))}{row}'
+             f'<button>{"Check again" if checked else "Check"}</button>'
+             "</form>"
+             + (banner(verdict, vkind) if verdict else "")
+             + f'<div style="max-width:230px">'
+               f'{field("now_gal", "Volume in the carboy now (gal)", now_gal, now_hint)}'
+               "</div>"
+             + '<p class="mut">The check writes nothing — re-read as many '
+               "times as you like. Recording the pitch is the only write.</p>")
+    return f'<div class="panel">{inner}</div>'
 
 
 def record_form(slug, p, params, og, next_id, gal_now, now=None):
@@ -190,7 +199,9 @@ def record_form(slug, p, params, og, next_id, gal_now, now=None):
 <span>{field("goferm_g", "Go-Ferm (g)", g("goferm_g", num(p["goferm_g"], 1)), "Blank if you skipped it.", id_="rec-goferm")}</span>
 </div>
 {textarea("notes", "Notes", g("notes"), "Read low and stirred? Topped up? Say so here.", id_="rec-notes")}
-<button>Record the must</button></form>"""
+<div class="doit"><button>Record the must &amp; start the clock</button>
+<span class="mut">Writes {esc(g("id", next_id))} with the corrected OG, what
+went in, and {p["additions"]} dated feeds.</span></div></form>"""
 
 
 def must_page(req, params, msg=None, kind="ok"):
@@ -230,21 +241,20 @@ def must_page(req, params, msg=None, kind="ok"):
     next_id = calc.next_batch_id(existing, year)
     if params.get("id") and params["id"].strip().upper() in existing:
         params = dict(params, id="")       # offer the next one instead
-    rf = read_form(r["slug"], p, params, bool(verdict), corr)
     rec = record_form(r["slug"], p, params, og, next_id, gal_now)
-    if verdict:
-        # the verdict names which form is next: a re-read opens the check
-        head = ('<h2 id="check" class="noprint">Read it</h2>'
-                + banner(verdict, vkind)
-                + details("Check again", rf, open_=(vkind == "warn"))
-                + '<h2 id="record" class="noprint">Pitched? Record it</h2>'
-                + rec)
-    else:
-        head = ('<h2 id="check" class="noprint">Read it</h2>' + rf
-                + '<div id="record">'
-                + details("Record the must without a check", rec)
-                + "</div>")
-    body = (card(strip) + steps(p, og, gal_now) + head
+    # the whole of must day in one card: what you do, then the reading that
+    # tells you whether it worked
+    tag = pill("{} gal · next id {}".format(num(p["gal"]), next_id), "ok")
+    must_card = (
+        '<div class="card">'
+        '<div class="sheet-head"><h2>Must day, in floor order</h2>'
+        + tag + "</div>"
+        + steps(p, og, gal_now)
+        + read_form(r["slug"], p, params, bool(verdict), corr, verdict, vkind)
+        + "</div>")
+    body = (card(strip) + must_card
+            + '<h2 id="record" class="noprint">Pitched? Record it</h2>'
+            + rec
             + f'<p class="mut noprint"><a href="/recipes/{esc(r["slug"])}">'
               f"Back to {esc(r['name'])}</a> · this page prints clean for the "
               "barrel.</p>")

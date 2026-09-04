@@ -225,21 +225,24 @@ class PagesTest(BatchTestCase):
         self.assertIn('id="rec-ph" name="ph" type="number" value="3.9"', body)
         self.assertIn('name="honey_lb" type="number" value="18.29"', body)
         self.assertIn('name="reading" value="1.101"', body)
-        # a low reading asks for a re-read, so the check form stays open
-        self.assertIn('<details class="sec" open><summary>Check again</summary>',
-                      body)
-        # ...and on target it tucks away
+        # the check panel is always there, prefilled, ready to re-run — a
+        # re-read costs no disclosure
+        self.assertIn('<div class="panel">', body)
+        self.assertIn("<button>Check again</button>", body)
+        self.assertIn("The check writes nothing", body)
         body = self.get(MUST, {"gal": "6", "reading": "1.106"}).body
-        self.assertIn('<details class="sec"><summary>Check again</summary>',
-                      body)
+        self.assertIn("<button>Check again</button>", body)
         # every id on the page is unique, so labels focus the right field
         ids = re.findall(r' id="([^"]+)"', body)
         self.assertEqual(len(ids), len(set(ids)), sorted(
             i for i in ids if ids.count(i) > 1))
-        # without a check the record form is there but tucked away
-        body = self.get(MUST, {"gal": "6"}).body
-        self.assertIn("Record the must without a check", body)
+        # the pitch is never gated on a check: the form is there either
+        # way, just with the OG still to type
+        body = self.get(MUST, {"gal": "6",
+                               "pitched_at": "2026-09-10T09:00"}).body
+        self.assertIn("Record the must &amp; start the clock", body)
         self.assertIn('name="og" type="number" value=""', body)
+        self.assertIn("Writes B-2026-001 with the corrected OG", body)
 
     def test_feed_step_follows_the_measured_og(self):
         # target-sized before a check...

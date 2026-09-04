@@ -158,7 +158,9 @@ class PagesTest(RecipeTestCase):
         r = self.get("/", {"recipe": "orange-blossom-traditional"})
         self.assertIn("Redesign Orange Blossom Traditional", r.body)
         self.assertIn('name="abv" type="number" value="14"', r.body)
-        self.assertIn('name="yeast" type="text" value="71B"', r.body)
+        # the strain is a pill radio now, and this recipe's is the one lit
+        self.assertIn('<label class="on"><input type="radio" name="yeast" '
+                      'value="71B" checked>71B</label>', r.body)
         self.assertIn('name="from_slug" value="orange-blossom-traditional"',
                       r.body)
         self.assertIn("Save changes to Orange Blossom Traditional", r.body)
@@ -170,8 +172,8 @@ class PagesTest(RecipeTestCase):
                            "honey": "orange blossom", "notes": "keep"})
         body = r.body
         self.assertEqual(body.count("<form"), 1)
-        self.assertIn('<button formmethod="post" formaction="/recipes">'
-                      "Save recipe</button>", body)
+        self.assertIn('<button class="block" formmethod="post" '
+                      'formaction="/recipes">Save recipe</button>', body)
         self.assertIn('name="name" type="text" value="Orange Blossom '
                       'Traditional"', body)
         self.assertIn('value="orange blossom"', body)
@@ -179,6 +181,26 @@ class PagesTest(RecipeTestCase):
         # the save card sits inside the targets form, after the sheet
         self.assertLess(body.index('id="targets"'), body.index('class="card save"'))
         self.assertLess(body.index('class="card save"'), body.index("</form>"))
+
+    def test_strain_and_demand_are_pickers(self):
+        body = self.get("/", {"gal": "6", "abv": "14", "yeast": "D47",
+                              "demand": "high"}).body
+        # every strain the tolerance table knows is offered, D47 lit
+        for y in ("71B", "D47", "QA23", "EC-1118", "K1V-1116"):
+            self.assertIn(f'value="{y}"', body)
+        self.assertIn('<label class="on"><input type="radio" name="yeast" '
+                      'value="D47" checked>D47</label>', body)
+        self.assertIn('<div class="seg">', body)
+        self.assertIn('<label class="on"><input type="radio" name="demand" '
+                      'value="high" checked>high</label>', body)
+        self.assertIn("D47", body)
+
+    def test_a_strain_off_the_list_still_round_trips(self):
+        self.post("/recipes", dict(OWNER, name="House Strain",
+                                   yeast="Wyeast 4184"))
+        body = self.get("/", {"recipe": "house-strain"}).body
+        self.assertIn('value="Wyeast 4184" checked>Wyeast 4184</label>', body)
+        self.assertIn("10 g Wyeast 4184", body)
 
     def test_cleared_abv_means_set_by_og(self):
         r = self.get("/", {"gal": "6", "abv": "", "og": "1.1067"})
