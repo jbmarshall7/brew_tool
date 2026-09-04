@@ -2,6 +2,7 @@
 import argparse
 import os
 import socket
+import sys
 import webbrowser
 from pathlib import Path
 
@@ -43,7 +44,12 @@ def main():
     except ImportError:
         pass
     host = "0.0.0.0" if args.lan else "127.0.0.1"
-    srv = make_server(store, host, args.port)
+    try:
+        srv = make_server(store, host, args.port)
+    except OSError as e:
+        sys.exit(f"Port {args.port} is busy ({e.strerror}) — brew_tool may "
+                 f"already be running at http://127.0.0.1:{args.port}/ ; "
+                 "pick another with --port.")
     local = f"http://127.0.0.1:{args.port}/"
     print(f"brew_tool — {local}")
     if args.lan:

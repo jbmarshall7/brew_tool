@@ -81,10 +81,21 @@ class SaveTest(RecipeTestCase):
         self.assertEqual(json.dumps(doc, indent=2, sort_keys=True,
                                     ensure_ascii=False) + "\n", text)
 
-    def test_blank_name_refused(self):
-        r = self.post("/recipes", dict(OWNER, name="  "))
-        self.assertEqual(r.status, 200)
-        self.assertIn("Give the recipe a name", r.body)
+    def test_blank_name_refused_and_nothing_lost(self):
+        from urllib.parse import parse_qs, urlparse
+        r = self.post("/recipes", dict(OWNER, name="  ", abv="13.5",
+                                       notes="try D47 next time"))
+        self.assertEqual(r.status, 303)
+        u = urlparse(r.location)
+        self.assertEqual(u.path, "/")
+        q = {k: v[0] for k, v in parse_qs(u.query).items()}
+        self.assertIn("Give the recipe a name", q["msg"])
+        self.assertEqual(q["abv"], "13.5")
+        self.assertEqual(q["notes"], "try D47 next time")
+        body = self.get("/", q).body
+        self.assertIn('class="msg err"', body)
+        self.assertIn('name="abv" type="number" value="13.5"', body)
+        self.assertIn("try D47 next time", body)
         self.assertEqual(list((self.root / "recipes").glob("*.json")), [])
 
     def test_duplicate_name_refused_and_nothing_lost(self):
@@ -152,12 +163,69 @@ class PagesTest(RecipeTestCase):
         self.assertIn("Save changes to Orange Blossom Traditional", r.body)
         self.assertIn('value="orange blossom"', r.body)
 
-    def test_design_page_offers_save_and_carries_inputs(self):
-        r = self.get("/", {"gal": "6", "abv": "14", "yeast_g": "10"})
-        self.assertIn('action="/recipes"', r.body)
-        self.assertIn('name="gal" value="6"', r.body)
-        self.assertIn('name="yeast_g" value="10"', r.body)
-        self.assertIn("<button>Save recipe</button>", r.body)
+    def test_design_page_is_one_form_so_a_recompute_keeps_the_name(self):
+        r = self.get("/", {"gal": "6", "abv": "14", "yeast_g": "10",
+                           "name": "Orange Blossom Traditional",
+                           "honey": "orange blossom", "notes": "keep"})
+        body = r.body
+        self.assertEqual(body.count("<form"), 1)
+        self.assertIn('<button formmethod="post" formaction="/recipes">'
+                      "Save recipe</button>", body)
+        self.assertIn('name="name" type="text" value="Orange Blossom '
+                      'Traditional"', body)
+        self.assertIn('value="orange blossom"', body)
+        self.assertIn(">keep</textarea>", body)
+        # the save card sits inside the targets form, after the sheet
+        self.assertLess(body.index('id="targets"'), body.index('class="card save"'))
+        self.assertLess(body.index('class="card save"'), body.index("</form>"))
+
+    def test_cleared_abv_means_set_by_og(self):
+        r = self.get("/", {"gal": "6", "abv": "", "og": "1.1067"})
+        self.assertIn('name="abv" type="number" value=""', r.body)
+        self.assertIn("Strength is set by the OG below", r.body)
+        self.assertIn("18.29 lb", r.body)
+
+    def test_typed_strings_are_escaped_everywhere(self):
+        self.post("/recipes", dict(OWNER, name='Cyser "2" <b>',
+                                   honey="<i>oak</i>",
+                                   notes="<script>x</script>"))
+        lst = self.get("/recipes").body
+        main = lst.split("<main>")[1]
+        self.assertIn("Cyser &quot;2&quot; &lt;b&gt;", main)
+        self.assertNotIn('"2" <b>', main)
+        self.assertNotIn("<i>oak", main)
+        red = self.get("/", {"recipe": "cyser-2-b"}).body
+        for expected in ('value="Cyser &quot;2&quot; &lt;b&gt;"',
+                         'value="&lt;i&gt;oak&lt;/i&gt;"',
+                         "&lt;script&gt;x&lt;/script&gt;"):
+            self.assertIn(expected, red)
+        self.assertNotIn("<script>x", red)
+        must = self.get("/recipes/cyser-2-b/must").body
+        self.assertNotIn('"2" <b>', must)
+        self.assertIn("Cyser &quot;2&quot; &lt;b&gt;", must)
+
+    def test_pages_never_read_the_cached_computed_block(self):
+        self.post("/recipes", OWNER)
+        path = self.root / "recipes" / "orange-blossom-traditional.json"
+        doc = json.loads(path.read_text())
+        doc["strength"]["abv"] = 13.0           # a hand edit, computed stale
+        del doc["computed"]
+        path.write_text(json.dumps(doc))
+        self.assertIn("13 % · OG 1.099", self.get("/recipes").body)
+        page = self.get("/recipes/orange-blossom-traditional").body
+        self.assertIn("2.83 lb per gallon", page)
+        self.assertIn("16.97 lb", page)
+
+    def test_one_broken_file_costs_one_row(self):
+        self.post("/recipes", OWNER)
+        (self.root / "recipes" / "wildflower.json").write_text(
+            '{"name": "Wildflower",}')
+        home = self.get("/").body
+        self.assertIn('id="targets"', home)
+        lst = self.get("/recipes").body
+        self.assertIn("Orange Blossom Traditional", lst)
+        self.assertIn('class="msg warn"', lst)
+        self.assertIn("wildflower.json isn&#x27;t valid JSON", lst)
 
     def test_the_script_is_only_a_submit(self):
         self.assertIn("f.submit()", SCRIPT)

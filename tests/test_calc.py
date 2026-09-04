@@ -15,7 +15,8 @@ from brew import calc as c
 
 class GravityTest(unittest.TestCase):
     def test_abv(self):
-        # (1.100 - 1.000) * 131.25 = 13.125 -> 13.13
+        # (1.100 - 1.000) * 131.25 is 13.12500000000001 in binary, so
+        # round() gives 13.13 (an exact 13.125 would round to 13.12)
         self.assertEqual(c.abv(1.100, 1.000), 13.13)
         self.assertEqual(c.abv(1.1067, 1.0), 14.0)
 
@@ -33,6 +34,7 @@ class GravityTest(unittest.TestCase):
         # standard density polynomial, 60 F hydrometer
         self.assertEqual(c.hydro_correct(1.050, 77, 60), 1.052)
         self.assertEqual(c.hydro_correct(1.101, 76, 60), 1.1029)
+        self.assertEqual(c.hydro_correct(1.101, 76, 68), 1.1021)
         self.assertEqual(c.hydro_correct(1.050, 60, 60), 1.05)
 
 
@@ -51,7 +53,8 @@ class HoneyWaterTest(unittest.TestCase):
         self.assertEqual(c.water_gal(6, 18.29), 4.48)
 
     def test_expected_og(self):
-        # 1 + 18.3 * 35 / 6 / 1000 = 1.10675 -> 1.1067 (round half even)
+        # 1 + 18.3*35/6/1000 is 1.10674999... in binary (just under the
+        # midpoint), so round() gives 1.1067; pages show 1.107 either way
         self.assertEqual(c.expected_og(18.3, 6), 1.1067)
         self.assertEqual(c.expected_og(15, 5), 1.105)
 
@@ -121,8 +124,16 @@ class CorrectionTest(unittest.TestCase):
         self.assertIn("happy", c.ph_verdict(3.9)["text"])
         self.assertEqual(c.ph_verdict(4.4)["kind"], "ok")
         self.assertIn("high side", c.ph_verdict(4.4)["text"])
-        self.assertEqual(c.ph_verdict(3.5)["kind"], "ok")
+        self.assertEqual(c.ph_verdict(3.6)["kind"], "ok")
+        self.assertIn("low side, fine", c.ph_verdict(3.6)["text"])
+        # 3.2-3.5 will likely crash in primary: a warning, not "fine"
+        self.assertEqual(c.ph_verdict(3.25)["kind"], "warn")
+        self.assertIn("drops further", c.ph_verdict(3.25)["text"])
         self.assertEqual(c.ph_verdict(3.1)["kind"], "warn")
+        self.assertIn("floor", c.ph_verdict(3.1)["text"])
+        # above 4.8 doubt the meter
+        self.assertEqual(c.ph_verdict(7.0)["kind"], "warn")
+        self.assertIn("calibration", c.ph_verdict(7.0)["text"])
 
 
 class ScheduleTest(unittest.TestCase):
@@ -154,6 +165,18 @@ class ScheduleTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             c.schedule("yesterday-ish", 1.100, 1.0, 5)
 
+    def test_og_at_or_below_fg_refused(self):
+        with self.assertRaisesRegex(ValueError, "leave anything"):
+            c.schedule("2026-09-03T15:40", 0.998, 1.0, 5)
+        with self.assertRaisesRegex(ValueError, "leave anything"):
+            c.schedule("2026-09-03T15:40", 1.010, 1.010, 5)
+
+    def test_finish_gravity_threads_through(self):
+        # (1.1029 - 1.010) * 131.25 = 12.19 % -> 152 ppm -> 152/40*6 = 22.8 g
+        s = c.schedule("2026-09-03T15:40", 1.1029, 1.010, 6)
+        self.assertEqual((s["yan_ppm"], s["total_g"], s["stop_sg"]),
+                         (152, 22.8, 1.072))
+
 
 class PlanTest(unittest.TestCase):
     def test_the_owners_batch(self):
@@ -184,6 +207,17 @@ class PlanTest(unittest.TestCase):
         for key in ("honey_lb", "water_gal", "yan_ppm", "nutrient_g",
                     "per_addition_g", "third_break_sg", "abv_if_dry"):
             self.assertEqual(by_og[key], by_abv[key], key)
+
+    def test_finish_gravity_above_dry(self):
+        # og = 1.010 + 14/131.25 = 1.1167; honey 116.7*6/35 = 20.01 lb;
+        # third break 1.1167 - 0.1067/3 = 1.081
+        p = c.plan(6, 14, fg=1.010, yeast_g=10)
+        self.assertEqual((p["og"], p["honey_lb"], p["water_gal"],
+                          p["third_break_sg"], p["abv_if_dry"], p["yan_ppm"]),
+                         (1.1167, 20.01, 4.33, 1.081, 14.0, 175))
+        q = c.plan(6, og=1.1067, fg=1.010)
+        self.assertEqual((q["abv"], q["yan_ppm"], q["third_break_sg"]),
+                         (12.69, 159, 1.074))
 
     def test_defaults(self):
         p = c.plan("6", "12")

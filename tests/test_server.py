@@ -53,6 +53,10 @@ class DispatchTest(unittest.TestCase):
         self.assertEqual(server.redirect("//evil.example", "x").location[:2],
                          "/?")
         self.assertEqual(server.redirect("http://evil.example").location, "/")
+        # the banner goes before any #fragment, or the browser never sends it
+        self.assertEqual(
+            server.redirect("/recipes/x/must?gal=6#record", "No", "err").location,
+            "/recipes/x/must?gal=6&msg=No&kind=err#record")
 
     def test_banner_from_query(self):
         r = get("/", {"msg": "Hello <cellar>", "kind": "warn"})
@@ -84,6 +88,11 @@ class HttpTest(unittest.TestCase):
         self.assertEqual(resp.status, 200)
         self.assertIn("brew_tool", text)
         self.assertTrue(resp.getheader("Content-Type").startswith("text/html"))
+
+    def test_blank_query_values_reach_the_view(self):
+        resp, text = self.request("GET", "/?gal=6&abv=&og=1.1067")
+        self.assertIn('name="abv" type="number" value=""', text)
+        self.assertIn("Strength is set by the OG below", text)
 
     def test_cross_site_post_refused(self):
         resp, _ = self.request(

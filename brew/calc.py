@@ -37,7 +37,9 @@ TOSNA_HOURS = (24, 48, 72)       # additions 1-3, hours after pitch
 TOSNA_LAST_DAY = 7               # the last addition's cap, days after pitch
 ON_TARGET_PTS = 2.0              # within this of target = hydrometer resolution
 PH_FLOOR = 3.2
+PH_LOW_WATCH = 3.5               # below this it will likely crash in primary
 PH_NORMAL = (3.7, 4.2)
+PH_HIGH = 4.8                    # above this, doubt the meter before the must
 L_PER_GAL = 3.785
 OZ_PER_LB = 16
 # alcohol tolerance is approximate and moves with nutrition and temperature
@@ -228,22 +230,30 @@ def correction(measured_og, target_og, gallons, fg=1.0, ppg=PPG_PER_LB_HONEY,
 
 def ph_verdict(ph):
     lo, hi = PH_NORMAL
+    floor = f"({lo}–{hi} is normal, {PH_FLOOR} is the floor)"
     if ph < PH_FLOOR:
         return {"kind": "warn",
                 "text": f"pH {ph:g} — below the {PH_FLOOR} floor; the yeast "
                         "will struggle. This round doesn't compute a "
                         "correction: potassium bicarbonate in small doses, "
                         "re-measure each time."}
+    if ph < PH_LOW_WATCH:
+        return {"kind": "warn",
+                "text": f"pH {ph:g} — low, and it drops further as it "
+                        "ferments. Have potassium bicarbonate ready and "
+                        f"re-check at the first feeding {floor}."}
     if ph < lo:
         return {"kind": "ok", "text": f"pH {ph:g} — on the low side, fine "
-                                      f"({lo}–{hi} is normal, {PH_FLOOR} is "
-                                      "the floor)."}
+                                      f"{floor}."}
     if ph <= hi:
-        return {"kind": "ok", "text": f"pH {ph:g} — a happy must ({lo}–{hi} "
-                                      f"is normal, {PH_FLOOR} is the floor)."}
-    return {"kind": "ok", "text": f"pH {ph:g} — on the high side; normal for "
-                                  "a fresh honey must, it drops once the "
-                                  "yeast gets going."}
+        return {"kind": "ok", "text": f"pH {ph:g} — a happy must {floor}."}
+    if ph <= PH_HIGH:
+        return {"kind": "ok", "text": f"pH {ph:g} — on the high side; normal "
+                                      "for a fresh honey must, it drops once "
+                                      "the yeast gets going."}
+    return {"kind": "warn", "text": f"pH {ph:g} — unusually high for a honey "
+                                    "must. Check the meter's calibration "
+                                    "before trusting it."}
 
 
 # --- the feeding schedule ---------------------------------------------------
@@ -288,6 +298,9 @@ def schedule(pitched_at, og, fg, gallons, demand="medium", product="fermaid-o",
     for all of them: nothing after a third of the sugar is gone.
     """
     pitch = parse_when(pitched_at) if isinstance(pitched_at, str) else pitched_at
+    if og <= fg:
+        raise ValueError(f"OG {og} doesn't leave anything to ferment above "
+                         f"FG {fg} — check the reading")
     n = int(additions)
     if n < 1 or n > 8:
         raise ValueError("nutrient additions should be between 1 and 8")

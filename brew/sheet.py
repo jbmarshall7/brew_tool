@@ -14,6 +14,16 @@ def product_name(key):
     return PRODUCT_NAMES.get(key, key)
 
 
+def feed_when(n, stop_sg):
+    """The timing sentence for `n` feedings — the same rule schedule() uses:
+    24 h apart, the last by day 7 or the 1/3 break."""
+    if n <= 1:
+        return f"24 h after pitch, or the 1/3 break (SG {stop_sg}) if sooner"
+    hours = ", ".join(f"{24 * i} h" for i in range(1, n))
+    return (f"{hours}, last by day {calc.TOSNA_LAST_DAY} or the 1/3 break "
+            f"(SG {stop_sg})")
+
+
 def value(main, small=None):
     return raw(esc(main) + (f" <small>{esc(small)}</small>" if small else ""))
 
@@ -26,10 +36,7 @@ def rows(p):
     if p["fg"] != 1.0 and p["strength_by"] == "abv":
         og_note = f"{sg(p['fg'])} + {num(p['abv'], 1)} ÷ {calc.ABV_FACTOR}"
     pname = product_name(p["product"])
-    feed_when = ", ".join(f"{h} h" for h in calc.TOSNA_HOURS[:p["additions"] - 1]) \
-        if p["additions"] > 1 else "with the pitch"
-    if p["additions"] > 1:
-        feed_when += f", last by the 1/3 break"
+    when = feed_when(p["additions"], sg(p["third_break_sg"]))
     return [
         ("OG", sg(p["og"]), og_note),
         ("Honey", value(lb_oz(p["honey_lb"]), f"{num(p['honey_lb_per_gal'])} lb/gal"),
@@ -56,7 +63,7 @@ def rows(p):
         (pname, value(f"{num(p['nutrient_g'], 1)} g",
                       f"as {p['additions']} × {num(p['per_addition_g'], 1)} g"),
          f"{p['yan_ppm']} ÷ {num(p['constants']['YAN_PPM_PER_G_PER_GAL.' + p['product']])} "
-         f"ppm per g per gal × {num(p['gal'])} gal; at {feed_when}"),
+         f"ppm per g per gal × {num(p['gal'])} gal; at {when}"),
         ("Stop nitrogen at", f"SG {sg(p['third_break_sg'])}",
          "OG − (OG − FG) ÷ 3 — nothing after this: late nitrogen feeds the "
          "wrong things"),

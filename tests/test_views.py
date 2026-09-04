@@ -54,6 +54,14 @@ class DesignPageTest(unittest.TestCase):
         self.assertIn('value="abc"', r.body)      # what they typed survives
         self.assertNotIn("you&#x27;ll need", r.body)
 
+    def test_feed_text_follows_the_count(self):
+        r = get("/", {"gal": "6", "abv": "14", "additions": "5"})
+        self.assertIn("as 5 × 5.2 g", r.body)
+        self.assertIn("at 24 h, 48 h, 72 h, 96 h, last by day 7 or the 1/3 "
+                      "break (SG 1.071)", r.body)
+        r = get("/", {"gal": "6", "abv": "14", "additions": "1"})
+        self.assertIn("at 24 h after pitch, or the 1/3 break", r.body)
+
     def test_touch_targets(self):
         self.assertIn("min-height:44px", html.CSS)
         r = get("/").body

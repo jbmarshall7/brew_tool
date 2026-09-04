@@ -7,6 +7,7 @@ files: the directory listing is the index.
 import json
 import os
 import re
+import sys
 import tempfile
 from pathlib import Path
 
@@ -73,10 +74,32 @@ class Store:
         self.write_json(self.recipe_path(recipe["slug"]), recipe)
         return recipe
 
-    def list_recipes(self):
+    def _read_all(self, paths):
+        """Every readable record; a broken file costs one row, not the page."""
         out = []
-        for f in sorted(self.recipes_dir.glob("*.json")):
-            out.append(self.read_json(f))
+        for f in paths:
+            try:
+                doc = self.read_json(f)
+            except ValueError as e:
+                sys.stderr.write(f"brew_tool: skipping {e}\n")
+                continue
+            if isinstance(doc, dict):
+                out.append(doc)
+        return out
+
+    def unreadable(self):
+        """The files that could not be parsed, as plain-words messages."""
+        problems = []
+        for f in sorted(list(self.recipes_dir.glob("*.json"))
+                        + list(self.batches_dir.glob("*.json"))):
+            try:
+                self.read_json(f)
+            except ValueError as e:
+                problems.append(str(e))
+        return problems
+
+    def list_recipes(self):
+        out = self._read_all(sorted(self.recipes_dir.glob("*.json")))
         return sorted(out, key=lambda r: (r.get("name") or "").lower())
 
     def honey_names(self):
@@ -113,7 +136,7 @@ class Store:
         return batch
 
     def list_batches(self):
-        out = [self.read_json(f) for f in self.batches_dir.glob("*.json")]
+        out = self._read_all(self.batches_dir.glob("*.json"))
         return sorted(out, key=lambda b: (b.get("pitched_at") or "",
                                           b.get("id") or ""), reverse=True)
 

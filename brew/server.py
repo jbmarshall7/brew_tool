@@ -44,9 +44,15 @@ def redirect(path, msg=None, kind="ok"):
     path = (path or "/").replace("\r", "").replace("\n", "")
     if not path.startswith("/") or path.startswith("//"):
         path = "/"
+    # the banner rides in the query, so it must go before any #fragment —
+    # a browser never sends the fragment, and a banner hidden in it is a
+    # refusal the owner never sees
+    path, _, frag = path.partition("#")
     if msg:
         sep = "&" if "?" in path else "?"
         path = f"{path}{sep}msg={quote(msg)}&kind={kind}"
+    if frag:
+        path = f"{path}#{frag}"
     return Response("", 303, location=path)
 
 
@@ -81,7 +87,10 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def _query(self):
-        return {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+        # keep blanks: a cleared ABV field means "set by OG", not "default"
+        return {k: v[0] for k, v in
+                parse_qs(urlparse(self.path).query,
+                         keep_blank_values=True).items()}
 
     def _form(self):
         length = int(self.headers.get("Content-Length") or 0)

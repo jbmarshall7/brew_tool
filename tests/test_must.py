@@ -77,11 +77,39 @@ class MustTest(unittest.TestCase):
         self.assertIn("15.24 lb", r.body)
         self.assertIn("5 gal of Orange Blossom Traditional", r.body)
 
-    def test_nonsense_reading_is_a_banner(self):
-        r = self.get({"gal": "6", "reading": "11.01"})
+    def test_nonsense_reading_keeps_the_page(self):
+        r = self.get({"gal": "6", "reading": "11.01", "ph": "3.9"})
         self.assertEqual(r.status, 200)
         self.assertIn('class="msg err"', r.body)
         self.assertIn("hydrometer reading 11.01 is above 1.25", r.body)
+        self.assertIn('<ol class="steps">', r.body)                # the sheet
+        self.assertIn('name="reading" type="number" value="11.01"', r.body)
+        self.assertIn("<button>Check</button>", r.body)
+        self.assertIn("Back to Orange Blossom Traditional", r.body)
+
+    def test_calibration_changes_the_verdict(self):
+        r = self.get({"gal": "6", "reading": "1.101", "temp_f": "76",
+                      "cal_f": "68"})
+        self.assertIn("OG 1.102 (read 1.101 at 76 °F, hydrometer 68 °F)",
+                      r.body)
+        self.assertIn("4.6 points under 1.107", r.body)
+
+    def test_ph_bands(self):
+        self.assertIn("low, and it drops further",
+                      self.get({"gal": "6", "ph": "3.25"}).body)
+        self.assertIn('class="msg warn"', self.get({"gal": "6", "ph": "3.25"}).body)
+        self.assertIn("on the low side, fine",
+                      self.get({"gal": "6", "ph": "3.6"}).body)
+        self.assertIn("unusually high", self.get({"gal": "6", "ph": "7"}).body)
+
+    def test_feed_text_for_five_feedings(self):
+        dispatch(Request("POST", "/recipes", {},
+                         dict(OWNER, name="Five Feeds", additions="5"), (),
+                         self.store))
+        body = dispatch(Request("GET", "/recipes/five-feeds/must", {"gal": "6"},
+                                {}, (), self.store)).body
+        self.assertIn("Weigh five cups now. 24 h, 48 h, 72 h, 96 h, last by "
+                      "day 7 or the 1/3 break (SG 1.071)", body)
 
     def test_links_in(self):
         r = dispatch(Request("GET", "/recipes", {}, {}, (), self.store))

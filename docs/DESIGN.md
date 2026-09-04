@@ -100,7 +100,7 @@ Rules: `strength.by` is `"abv"` or `"og"`; whichever the owner set is stored, th
 {
   "added": {"goferm_g": 12.5, "honey_lb": 18.3, "water_gal": 4.5, "yeast_g": 10.0},
   "id": "B-2026-003",
-  "measured": {"cal_f": 60, "expected_og": 1.1068, "og": 1.1029, "ph": 3.9, "reading": 1.101, "sample_f": 76},
+  "measured": {"cal_f": 60, "expected_og": 1.1067, "og": 1.1029, "ph": 3.9, "reading": 1.101, "sample_f": 76},
   "notes": "read low by 4; stirred, carried on",
   "nutrients": {
     "additions": [

@@ -19,8 +19,9 @@ def when(text):
 def feed_table(b):
     n = b.get("nutrients") or {}
     pname = product_name(n.get("product"))
-    rows = [[f"#{a['n']}", f"{num(a['g'], 1)} g {pname}", when(a["due"]),
-             a["rule"]] for a in n.get("additions", [])]
+    rows = [[f"#{a.get('n', i + 1)}", f"{num(a.get('g'), 1)} g {pname}",
+             when(a.get("due")), a.get("rule") or ""]
+            for i, a in enumerate(n.get("additions") or [])]
     return table(["", "Feed", "When", "Or sooner if"], rows,
                  empty="No feeding schedule on this batch.")
 
@@ -64,13 +65,18 @@ def batch(req):
         ("If it goes dry", f"{num(calc.abv(m['og'], (b.get('target') or {}).get('fg', 1.0)), 1)} %"
          if m.get("og") is not None else "—", None),
     ])
-    feed = (f"<h2>Feed — {product_name(n.get('product'))} "
-            f"{num(n.get('total_g'), 1)} g for {n.get('yan_ppm')} ppm YAN, "
-            f"sized from OG {sg(n.get('from_og') or 0)}</h2>"
-            + feed_table(b)
-            + f'<p class="mut">Stop at SG {sg(n.get("stop_sg") or 0)} whatever '
-              "the calendar says. Nothing after this: late nitrogen feeds the "
-              "wrong things.</p>")
+    stop = n.get("stop_sg") or next(
+        (a.get("stop_sg") for a in n.get("additions") or [] if a.get("stop_sg")),
+        None)
+    feed = ("<h2>" + esc(f"Feed — {product_name(n.get('product'))} "
+                         f"{num(n.get('total_g'), 1)} g for "
+                         f"{n.get('yan_ppm', '—')} ppm YAN, sized from OG "
+                         f"{sg(n['from_og']) if n.get('from_og') else '—'}")
+            + "</h2>" + feed_table(b)
+            + '<p class="mut">'
+            + (f"Stop at SG {sg(stop)} whatever the calendar says. " if stop
+               else "")
+            + "Nothing after this: late nitrogen feeds the wrong things.</p>")
     notes = (f"<h2>Notes</h2><p>{esc(b['notes'])}</p>" if b.get("notes")
              else "")
     body = (card(facts) + feed + notes

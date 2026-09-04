@@ -74,6 +74,11 @@ button.quiet { background:transparent; color:var(--accent-dk);
 .msg.err { background:#f9ece9; border-color:#e0b8b0; color:var(--err); }
 .msg.warn { background:#f8f1e2; border-color:#e2cf9f; color:#7a5a1d; }
 .mut { color:var(--mut); font-size:13.5px; }
+a.btn { display:inline-flex; align-items:center; min-height:44px; padding:0 16px;
+        background:var(--accent); color:#fff; border-radius:6px; font-weight:600;
+        text-decoration:none; white-space:nowrap; }
+a.btn:hover { background:var(--accent-dk); }
+td .sub { display:block; color:var(--mut); font-size:13px; margin-top:2px; }
 .next { font-size:15px; margin:12px 0; }
 .next a { font-weight:600; }
 details.sec { margin:10px 0; }
@@ -96,7 +101,7 @@ ol.steps .stitle { font-size:12.5px; color:var(--mut); text-transform:uppercase;
               letter-spacing:.3px; font-weight:600; }
 ol.steps .big { font-size:1.4em; font-weight:600; line-height:1.3; }
 @media print {
-  header, form, button, details, .msg, .noprint { display:none !important; }
+  header, form, button, details, .msg.err, .noprint { display:none !important; }
   body { background:#fff; font-size:14px; } main { max-width:none; padding:0; }
   .card { border:none; padding:6px 0; }
 }
@@ -181,16 +186,17 @@ def next_link(href, text):
 
 
 def field(name, label, value="", hint=None, typ="number", step="any",
-          required=False, attrs=""):
+          required=False, attrs="", id_=None):
     v = "" if value is None else str(value)
+    fid = id_ or f"f-{name}"
     extra = ' inputmode="decimal"' if typ == "number" else ""
     stepattr = f' step="{step}"' if typ == "number" and step else ""
     if typ == "datetime-local":
         extra = ' placeholder="2026-09-03T15:40"'
         stepattr = ' step="60"' 
     req = " required" if required else ""
-    return (f'<label for="f-{esc(name)}">{esc(label)}</label>'
-            f'<input id="f-{esc(name)}" name="{esc(name)}" type="{typ}" '
+    return (f'<label for="{esc(fid)}">{esc(label)}</label>'
+            f'<input id="{esc(fid)}" name="{esc(name)}" type="{typ}" '
             f'value="{esc(v)}"{stepattr}{extra}{req} {attrs}>'
             + (f'<span class="hint">{esc(hint)}</span>' if hint else ""))
 
@@ -204,9 +210,10 @@ def select(name, label, options, value=None, hint=None):
             + (f'<span class="hint">{esc(hint)}</span>' if hint else ""))
 
 
-def textarea(name, label, value="", hint=None):
-    return (f'<label for="f-{esc(name)}">{esc(label)}</label>'
-            f'<textarea id="f-{esc(name)}" name="{esc(name)}">{esc(value or "")}'
+def textarea(name, label, value="", hint=None, id_=None):
+    fid = id_ or f"f-{name}"
+    return (f'<label for="{esc(fid)}">{esc(label)}</label>'
+            f'<textarea id="{esc(fid)}" name="{esc(name)}">{esc(value or "")}'
             "</textarea>"
             + (f'<span class="hint">{esc(hint)}</span>' if hint else ""))
 

@@ -1,9 +1,10 @@
 """Save a design as a recipe; the recipe list; a recipe at any volume."""
 from datetime import date
+from urllib.parse import urlencode
 
 from . import calc
-from .html import (card, details, esc, field, hidden, kv, next_link, num,
-                   page as _page, pill, raw, sg, table)
+from .html import (banner, card, details, esc, field, hidden, kv,
+                   next_link, num, page as _page, pill, raw, sg, table)
 from .server import Response, redirect, route
 from .sheet import product_name, render_sheet
 from .store import slugify
@@ -68,15 +69,33 @@ def plan_for(r, gal):
 
 
 def strength_line(r):
-    c = r.get("computed") or {}
-    return f"{num(c.get('abv_if_dry'), 1)} % · OG {sg(c.get('og') or 0)}"
+    """Always from a fresh plan, never from the file's cached `computed`."""
+    try:
+        p = plan_for(r, r.get("design_gal") or 1)
+    except (ValueError, TypeError, KeyError):
+        return "—"
+    return f"{num(p['abv_if_dry'], 1)} % · OG {sg(p['og'])}"
+
+
+def keep_design(form):
+    """The Design page query that reproduces what the owner had typed."""
+    keep = {k: form.get(k, "") for k in DEFAULTS}
+    keep.update({"name": form.get("name", ""), "honey": form.get("honey", ""),
+                 "notes": form.get("notes", "")})
+    if form.get("from_slug"):
+        keep["recipe"] = form["from_slug"]
+    return "/?" + urlencode(keep)
 
 
 # --- POST /recipes: save --------------------------------------------------
 @route("POST", "/recipes")
 def save(req):
     store = req.store
-    recipe = recipe_from_form(req.form)
+    try:
+        recipe = recipe_from_form(req.form)
+    except ValueError as e:
+        # back to the Design page with everything typed still in place
+        return redirect(keep_design(req.form), str(e), "err")
     from_slug = (req.form.get("from_slug") or "").strip()
     if from_slug:
         # a redesign keeps its slug: the name is a label, the slug is the file
@@ -84,12 +103,7 @@ def save(req):
         recipe["slug"] = from_slug
         verb = "Updated"
     elif store.recipe_exists(recipe["slug"]):
-        keep = {k: req.form.get(k, "") for k in DEFAULTS}
-        keep.update({"name": req.form.get("name", ""),
-                     "honey": req.form.get("honey", ""),
-                     "notes": req.form.get("notes", "")})
-        from urllib.parse import urlencode
-        return redirect("/?" + urlencode(keep),
+        return redirect(keep_design(req.form),
                         f"There's already a recipe called {recipe['name']}. "
                         "Open it and Redesign, or give this one another name.",
                         "err")
@@ -112,15 +126,21 @@ def recipes(req):
     for r in req.store.list_recipes():
         gal = num(r.get("design_gal"))
         rows.append([raw(f'<a href="/recipes/{esc(r["slug"])}">'
-                         f'{esc(r["name"])}</a>'),
-                     strength_line(r), r.get("yeast") or "",
-                     r.get("honey") or "",
-                     raw(f'<a href="/recipes/{esc(r["slug"])}/must?gal='
-                         f'{esc(gal)}"><b>Make {esc(gal)} gal</b></a>')])
-    body = table(["Recipe", "Strength", "Yeast", "Honey", "Must"], rows,
+                         f'{esc(r["name"])}</a>'
+                         f'<span class="sub">{esc(strength_line(r))} · '
+                         f'{esc(r.get("yeast") or "")}'
+                         + (f' · {esc(r["honey"])}' if r.get("honey") else "")
+                         + "</span>"),
+                     raw(f'<a class="btn" href="/recipes/{esc(r["slug"])}/must'
+                         f'?gal={esc(gal)}">Make {esc(gal)} gal</a>')])
+    body = table(["Recipe", "Must"], rows,
                  empty="No recipes yet. Design one — it's two numbers.")
     if not rows:
         body += next_link("/", "Design a recipe")
+    problems = req.store.unreadable()
+    if problems:
+        body = banner("Some files couldn't be read and are left out:\n"
+                      + "\n".join(problems), "warn") + body
     return Response(_page("Recipes", body, "/recipes", req.params.get("msg"),
                           req.params.get("kind", "ok")))
 
@@ -143,7 +163,7 @@ def recipe(req):
          f"OG {sg(p['og'])} · {num(p['abv_if_dry'], 1)} % if dry at "
          f"FG {sg(p['fg'])}"),
         ("Honey", r.get("honey") or "—",
-         f"{num(r['computed']['honey_lb_per_gal'])} lb per gallon"),
+         f"{num(p['honey_lb_per_gal'])} lb per gallon"),
         ("Yeast", f"{num(r.get('yeast_g'), 1)} g {r.get('yeast')} "
                   f"at {num(r.get('design_gal'))} gal", None),
         ("Nutrients", f"{product_name(r.get('product'))} × "
