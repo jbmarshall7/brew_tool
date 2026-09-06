@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/organic-ed95b412-7322-41ae-aad1-026b32527ad1/styles.css">
+<script src="_ds/organic-ed95b412-7322-41ae-aad1-026b32527ad1/_ds_bundle.js"></script>
+<style>
+@keyframes wbfade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+body{margin:0;background:#f5ead8}
+a{color:var(--color-accent)}
+a:hover{color:var(--color-accent-700)}
+</style>
+</helmet>
+
+<div style="display:flex;align-items:stretch;min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body)">
+
+<sc-if value="{{ sideNav }}" hint-placeholder-val="{{ false }}">
+<aside style="width:232px;flex:none;padding:26px 20px;display:flex;flex-direction:column;gap:30px;background:color-mix(in srgb,var(--color-surface) 70%,transparent)">
+<div style="display:flex;align-items:center;gap:11px">
+<svg width="34" height="34" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="var(--color-accent)"></circle><path d="M22.5 11.2c-1.6-.6-3.2-.2-4.4.9-1.1 1-1.7 2.4-2.8 3.3-1.1.9-2.6 1.2-3.9.9-.5-.1-.8.5-.4.8 1.2 1 1.6 2.6 1.1 4-.6 1.6-2.2 2.7-3.9 2.7 2.6 1.4 5.9 1.1 8.4-.6 2.4-1.6 4-4.3 4.6-7.1l2.4-1.6c.3-.2.3-.7-.1-.8l-1.1-.4c.2-.7.5-1.4.9-2 .2-.4-.2-.8-.6-.6-.6.3-1.1.7-1.5 1.2z" fill="#f5ead8"></path><circle cx="19.2" cy="13.6" r="1" fill="#201e1d"></circle></svg>
+<div><div style="font-family:var(--font-heading);font-size:17px;line-height:1.05">Warblers</div><div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 50%,transparent)">brew tool</div></div>
+</div>
+<nav style="display:flex;flex-direction:column;gap:4px">
+<button onClick="{{ goToday }}" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:0;border-radius:999px;background:transparent;font:inherit;font-size:14px;text-align:left;color:inherit;cursor:pointer" style-hover="background:color-mix(in srgb,var(--color-text) 7%,transparent)">Today<sc-if value="{{ atToday }}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--color-accent)"></span></sc-if></button>
+<button onClick="{{ goBatch }}" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:0;border-radius:999px;background:transparent;font:inherit;font-size:14px;text-align:left;color:inherit;cursor:pointer" style-hover="background:color-mix(in srgb,var(--color-text) 7%,transparent)">In the cellar<sc-if value="{{ atBatch }}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--color-accent)"></span></sc-if></button>
+<button onClick="{{ goDesign }}" style="display:flex;align-items:center;gap:10px;padding:11px 14px;border:0;border-radius:999px;background:transparent;font:inherit;font-size:14px;text-align:left;color:inherit;cursor:pointer" style-hover="background:color-mix(in srgb,var(--color-text) 7%,transparent)">Design &amp; must<sc-if value="{{ atDesign }}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--color-accent)"></span></sc-if></button>
+</nav>
+<div style="margin-top:auto;font-size:11px;line-height:1.5;color:color-mix(in srgb,var(--color-text) 45%,transparent)">Data lives in <span style="font-family:ui-monospace,Menlo,monospace">data/</span> as JSON.<br>Git is the history.</div>
+</aside>
+</sc-if>
+
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+
+<sc-if value="{{ topNav }}" hint-placeholder-val="{{ true }}">
+<header class="nav" style="gap:22px;padding:16px 34px;border-bottom:1px solid var(--color-divider)">
+<div class="nav-brand" style="display:flex;align-items:center;gap:11px;margin-right:auto">
+<svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="16" fill="var(--color-accent)"></circle><path d="M22.5 11.2c-1.6-.6-3.2-.2-4.4.9-1.1 1-1.7 2.4-2.8 3.3-1.1.9-2.6 1.2-3.9.9-.5-.1-.8.5-.4.8 1.2 1 1.6 2.6 1.1 4-.6 1.6-2.2 2.7-3.9 2.7 2.6 1.4 5.9 1.1 8.4-.6 2.4-1.6 4-4.3 4.6-7.1l2.4-1.6c.3-.2.3-.7-.1-.8l-1.1-.4c.2-.7.5-1.4.9-2 .2-.4-.2-.8-.6-.6-.6.3-1.1.7-1.5 1.2z" fill="#f5ead8"></path><circle cx="19.2" cy="13.6" r="1" fill="#201e1d"></circle></svg>
+<span>Warblers Meadery</span>
+</div>
+<sc-for list="{{ navLinks }}" as="n" hint-placeholder-count="3">
+<button onClick="{{ n.go }}" style="padding:8px 2px 6px;border:0;border-bottom:2px solid {{ n.line }};background:transparent;font:inherit;font-size:14px;color:{{ n.ink }};cursor:pointer" style-hover="color:var(--color-accent)">{{ n.label }}</button>
+</sc-for>
+<button class="btn btn-primary" onClick="{{ newDesign }}" style="padding:10px 18px">New recipe</button>
+</header>
+</sc-if>
+
+<main style="flex:1;min-width:0;padding:34px 34px 60px;max-width:1240px">
+
+<sc-if value="{{ atToday }}" hint-placeholder-val="{{ true }}">
+<div style="animation:wbfade .25s ease">
+<div style="display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:6px">
+<h1 style="font-size:40px;margin:0">Thursday, September 4</h1>
+<span class="tag tag-accent" style="margin-bottom:8px">{{ liveCount }}</span>
+</div>
+<p style="font-size:15px;max-width:640px;color:color-mix(in srgb,var(--color-text) 62%,transparent)">{{ todayLede }}</p>
+
+<h2 style="font-size:22px;margin:30px 0 12px">Needs you now</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:16px">
+<sc-for list="{{ attention }}" as="a" hint-placeholder-count="3">
+<div class="card elev-sm" style="background:var(--color-accent-100);gap:10px;padding:20px 22px">
+<div class="card-kicker">{{ a.kicker }}</div>
+<div class="card-title" style="font-size:19px">{{ a.title }}</div>
+<p class="card-body" style="opacity:.75;font-size:13.5px">{{ a.body }}</p>
+<div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+<button class="btn btn-primary" onClick="{{ a.act }}" style="padding:10px 16px">{{ a.cta }}</button>
+<span style="font-size:11.5px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">{{ a.id }}</span>
+</div>
+</div>
+</sc-for>
+</div>
+
+<div style="display:flex;align-items:baseline;gap:14px;margin:36px 0 10px">
+<h2 style="font-size:22px;margin:0">In the cellar</h2>
+<span style="font-size:12.5px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">type a gravity on any row — the app does the rest</span>
+</div>
+<div class="card elev-sm" style="padding:6px 14px 10px">
+<table class="table">
+<thead><tr><th style="width:96px">Batch</th><th style="width:236px">What it is</th><th style="width:50px">Day</th><th style="width:96px">Gravity</th><th style="width:92px">Trend</th><th>Next thing</th><th style="width:178px">Log a reading</th></tr></thead>
+<tbody>
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="8">
+<tr>
+<td style="vertical-align:middle"><button onClick="{{ r.open }}" style="border:0;background:transparent;padding:0;font:inherit;font-size:13.5px;color:var(--color-accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px">{{ r.id }}</button></td>
+<td style="vertical-align:middle"><div style="font-size:14.5px;white-space:nowrap">{{ r.name }}</div><div style="font-size:11.5px;white-space:nowrap;color:color-mix(in srgb,var(--color-text) 50%,transparent)">{{ r.sub }}</div></td>
+<td style="vertical-align:middle;font-size:14px">{{ r.day }}</td>
+<td style="vertical-align:middle"><div style="font-size:16px;font-family:var(--font-heading)">{{ r.sg }}</div><div style="font-size:11px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">{{ r.sgSub }}</div></td>
+<td style="vertical-align:middle"><svg width="86" height="26" viewBox="0 0 86 26" aria-hidden="true"><polyline points="{{ r.spark }}" fill="none" stroke="var(--color-accent-2-600)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></polyline></svg></td>
+<td style="vertical-align:middle"><span class="{{ r.tagCls }}">{{ r.state }}</span><div style="font-size:12px;margin-top:4px;color:color-mix(in srgb,var(--color-text) 62%,transparent)">{{ r.next }}</div></td>
+<td style="vertical-align:middle">
+<sc-if value="{{ r.pitched }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;gap:6px">
+<input class="input" value="{{ r.draft }}" onChange="{{ r.type }}" onKeyDown="{{ r.key }}" placeholder="1.0__" inputMode="decimal" style="min-height:38px;font-size:14px;text-align:center" aria-label="Gravity reading">
+<button class="btn btn-secondary" onClick="{{ r.log }}" style="min-height:38px;padding:0 14px;flex:none;white-space:nowrap">Log</button>
+</div>
+</sc-if>
+<sc-if value="{{ r.planned }}" hint-placeholder-val="{{ false }}">
+<button class="btn btn-secondary" onClick="{{ r.makeMust }}" style="min-height:38px;padding:0 16px;flex:none;white-space:nowrap">Make must</button>
+</sc-if>
+</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+
+<p style="margin-top:22px;font-size:12.5px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">Nothing here is a status you have to keep up to date — every line is derived from the readings and the pitch date.</p>
+</div>
+</sc-if>
+
+<sc-if value="{{ atBatch }}" hint-placeholder-val="{{ false }}">
+<div style="animation:wbfade .25s ease">
+<button onClick="{{ goToday }}" style="border:0;background:transparent;padding:0;margin-bottom:14px;font:inherit;font-size:13px;color:var(--color-accent);cursor:pointer">&larr; Today</button>
+
+<div style="display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap">
+<div style="flex:1;min-width:320px">
+<div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-accent)">{{ b.id }}</div>
+<h1 style="font-size:38px;margin:2px 0 8px">{{ b.name }}</h1>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<span class="tag tag-neutral">{{ b.volText }}</span>
+<span class="tag tag-neutral">{{ b.strain }}</span>
+<span class="tag tag-neutral">{{ b.pitchedText }}</span>
+<span class="{{ b.tagCls }}">{{ b.state }}</span>
+</div>
+</div>
+<div style="display:flex;gap:26px;padding:16px 22px;border-radius:28px;background:var(--color-surface)">
+<div><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Now</div><div style="font-family:var(--font-heading);font-size:28px;line-height:1.1">{{ b.sg }}</div></div>
+<div><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 55%,transparent)">ABV so far</div><div style="font-family:var(--font-heading);font-size:28px;line-height:1.1">{{ b.abvNow }}</div></div>
+<div><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Attenuated</div><div style="font-family:var(--font-heading);font-size:28px;line-height:1.1">{{ b.att }}</div></div>
+<div><div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 55%,transparent)">Day</div><div style="font-family:var(--font-heading);font-size:28px;line-height:1.1">{{ b.day }}</div></div>
+</div>
+</div>
+
+<div style="display:flex;align-items:flex-start;gap:16px;margin:22px 0 0;padding:18px 22px;border-radius:28px;background:var(--color-accent-100)">
+<span style="font-family:var(--font-heading);font-size:15px;white-space:nowrap;color:var(--color-accent-800)">Next</span>
+<p style="margin:0;font-size:15.5px;line-height:1.5">{{ b.nextLong }}</p>
+<button class="btn btn-primary" onClick="{{ focusEntry }}" style="flex:none;padding:10px 18px">{{ b.nextCta }}</button>
+</div>
+
+<div style="display:grid;grid-template-columns:minmax(0,1.55fr) minmax(300px,1fr);gap:24px;align-items:start;margin-top:26px">
+
+<div style="display:flex;flex-direction:column;gap:18px">
+<div class="card elev-sm" style="padding:20px 22px;gap:14px">
+<div style="display:flex;align-items:center;gap:12px">
+<h2 style="font-size:21px;margin:0;flex:1">The log</h2>
+<div class="seg">
+<label class="seg-opt"><input type="radio" name="wbview" checked="{{ viewLedger }}" onChange="{{ showLedger }}">Ledger</label>
+<label class="seg-opt"><input type="radio" name="wbview" checked="{{ viewCurve }}" onChange="{{ showCurve }}">Curve</label>
+</div>
+</div>
+
+<div style="display:flex;gap:8px;align-items:flex-end;padding:14px 16px;border-radius:22px;background:color-mix(in srgb,var(--color-accent) 9%,transparent)">
+<div class="field" style="width:118px"><label>Gravity</label><input class="input" value="{{ entryReading }}" onChange="{{ typeReading }}" onKeyDown="{{ keyReading }}" placeholder="1.041" inputMode="decimal" style="min-height:40px;font-size:16px;text-align:center"></div>
+<div class="field" style="width:96px"><label>Sample °F</label><input class="input" value="{{ entryTemp }}" onChange="{{ typeTemp }}" onKeyDown="{{ keyReading }}" placeholder="68" inputMode="decimal" style="min-height:40px;font-size:16px;text-align:center"></div>
+<div class="field" style="flex:1;min-width:120px"><label>Note (optional)</label><input class="input" value="{{ entryNote }}" onChange="{{ typeNote }}" onKeyDown="{{ keyReading }}" placeholder="still bubbling" style="min-height:40px"></div>
+<button class="btn btn-primary" onClick="{{ addReading }}" style="min-height:40px;padding:0 20px;flex:none;white-space:nowrap">Log it</button>
+</div>
+<sc-if value="{{ hasBanner }}" hint-placeholder-val="{{ false }}">
+<p style="margin:0;padding:12px 16px;border-radius:20px;background:var(--color-accent-2-100);color:var(--color-accent-2-800);font-size:14px;line-height:1.5">{{ banner }}</p>
+</sc-if>
+
+<sc-if value="{{ viewLedger }}" hint-placeholder-val="{{ true }}">
+<table class="table">
+<thead><tr><th style="width:132px">When</th><th style="width:44px">Day</th><th style="width:76px">Gravity</th><th style="width:62px">Drop</th><th style="width:58px">ABV</th><th style="width:64px">Att.</th><th>Note</th></tr></thead>
+<tbody>
+<sc-for list="{{ ledger }}" as="l" hint-placeholder-count="7">
+<tr>
+<td style="font-size:13.5px;white-space:nowrap">{{ l.when }}</td>
+<td style="font-size:13.5px">{{ l.day }}</td>
+<td style="font-family:var(--font-heading);font-size:15px">{{ l.sg }}</td>
+<td style="font-size:13.5px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">{{ l.drop }}</td>
+<td style="font-size:13.5px">{{ l.abv }}</td>
+<td style="font-size:13.5px">{{ l.att }}</td>
+<td style="font-size:12.5px;color:color-mix(in srgb,var(--color-text) 60%,transparent)">{{ l.note }}</td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+<p style="margin:2px 0 0;font-size:12px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">Drop, ABV and attenuation are never typed — one gravity in, three columns out.</p>
+</sc-if>
+
+<sc-if value="{{ viewCurve }}" hint-placeholder-val="{{ false }}">
+<div>
+<svg viewBox="0 0 620 250" style="width:100%;height:auto;overflow:visible" role="img" aria-label="Gravity over time">
+<sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="4">
+<line x1="46" y1="{{ g.y }}" x2="608" y2="{{ g.y }}" stroke="color-mix(in srgb,#201e1d 10%,transparent)" stroke-width="1"></line>
+</sc-for>
+<sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="4">
+<text x="40" y="{{ g.ty }}" text-anchor="end" font-size="10.5" fill="#82796a" font-family="Figtree,system-ui">{{ g.label }}</text>
+</sc-for>
+<line x1="46" y1="{{ breakY }}" x2="608" y2="{{ breakY }}" stroke="var(--color-accent)" stroke-width="1.5" stroke-dasharray="5 5"></line>
+<text x="608" y="{{ breakLabelY }}" text-anchor="end" font-size="10.5" fill="var(--color-accent-700)" font-family="Figtree,system-ui">{{ breakLabel }}</text>
+<polyline points="{{ curvePoints }}" fill="none" stroke="var(--color-accent-2-600)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></polyline>
+<sc-for list="{{ feedMarks }}" as="f" hint-placeholder-count="4">
+<g><line x1="{{ f.x }}" y1="214" x2="{{ f.x }}" y2="226" stroke="var(--color-accent-600)" stroke-width="2"></line><text x="{{ f.x }}" y="242" text-anchor="middle" font-size="10" fill="#82796a" font-family="Figtree,system-ui">{{ f.label }}</text></g>
+</sc-for>
+<sc-for list="{{ curveDots }}" as="p" hint-placeholder-count="7">
+<circle cx="{{ p.x }}" cy="{{ p.y }}" r="4" fill="var(--color-bg)" stroke="var(--color-accent-2-700)" stroke-width="2"></circle>
+</sc-for>
+<text x="{{ lastX }}" y="{{ lastLabelY }}" text-anchor="{{ lastAnchor }}" font-size="13" font-family="Caprasimo,serif" fill="#201e1d">{{ b.sg }}</text>
+</svg>
+<p style="margin:8px 0 0;font-size:12px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">Dashed line is the 1/3 sugar break — where nitrogen stops. Ticks under the axis are the Fermaid O additions.</p>
+</div>
+</sc-if>
+</div>
+
+<div class="card elev-sm" style="padding:20px 22px;gap:12px">
+<h2 style="font-size:21px;margin:0">Must day, kept</h2>
+<div style="display:grid;grid-template-columns:150px 1fr;gap:9px 18px;font-size:14px">
+<sc-for list="{{ mustFacts }}" as="m" hint-placeholder-count="6">
+<span style="color:color-mix(in srgb,var(--color-text) 55%,transparent)">{{ m.label }}</span>
+<span>{{ m.value }}<sc-if value="{{ showFormulas }}" hint-placeholder-val="{{ true }}"><span style="display:block;font-size:12px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">{{ m.note }}</span></sc-if></span>
+</sc-for>
+</div>
+<p style="margin:6px 0 0;font-size:12px;color:color-mix(in srgb,var(--color-text) 45%,transparent)">File: data/batches/{{ b.id }}.json — prints clean for the barrel.</p>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:18px">
+<div class="card elev-sm" style="padding:20px 22px;gap:12px">
+<h2 style="font-size:19px;margin:0">Feeding — {{ b.feedHead }}</h2>
+<div style="display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ feeds }}" as="f" hint-placeholder-count="4">
+<label style="display:flex;align-items:center;gap:12px;padding:11px 6px;border-bottom:1px solid color-mix(in srgb,#201e1d 8%,transparent);cursor:pointer" style-hover="background:color-mix(in srgb,#201e1d 4%,transparent)">
+<input type="checkbox" checked="{{ f.done }}" onChange="{{ f.toggle }}" style="width:19px;height:19px;flex:none;accent-color:var(--color-accent)">
+<span style="flex:1"><span style="font-family:var(--font-heading);font-size:15px">{{ f.g }}</span><span style="display:block;font-size:12.5px;color:color-mix(in srgb,var(--color-text) 55%,transparent)">{{ f.when }}</span></span>
+<span class="{{ f.tagCls }}">{{ f.tag }}</span>
+</label>
+</sc-for>
+</div>
+<p style="margin:4px 0 0;font-size:12.5px;line-height:1.5;color:color-mix(in srgb,var(--color-text) 58%,transparent)">{{ b.feedFoot }}</p>
+</div>
+
+<div class="card elev-sm" style="padding:20px 22px;gap:10px;background:var(--color-accent-2-100)">
+<h2 style="font-size:19px;margin:0">What this is heading for</h2>
+<div style="display:grid;grid-template-columns:1fr auto;gap:7px 14px;font-size:14px">
+<sc-for list="{{ outlook }}" as="o" hint-placeholder-count="4">
+<span style="color:var(--color-accent-2-800)">{{ o.label }}</span>
+<span style="font-family:var(--font-heading);font-size:15px">{{ o.value }}</span>
+</sc-for>
+</div>
+</div>
+
+<div class="card elev-sm" style="padding:20px 22px;gap:8px">
+<h2 style="font-size:19px;margin:0">Other batches</h2>
+<sc-for list="{{ otherBatches }}" as="o" hint-placeholder-count="7">
+<button onClick="{{ o.open }}" style="display:flex;align-items:center;gap:10px;width:100%;padding:8px 6px;border:0;border-radius:14px;background:transparent;font:inherit;text-align:left;color:inherit;cursor:pointer" style-hover="background:color-mix(in srgb,#201e1d 5%,transparent)">
+<span style="font-size:12px;width:88px;flex:none;color:color-mix(in srgb,var(--color-text) 55%,transparent)">{{ o.id }}</span>
+<span style="flex:1;font-size:13.5px">{{ o.name }}</span>
+<span style="font-family:var(--font-heading);font-size:13.5px">{{ o.sg }}</span>
+</button>
+</sc-for>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{ atDesign }}" hint-placeholder-val="{{ false }}">
+<div style="animation:wbfade .25s ease">
+<h1 style="font-size:38px;margin:0 0 6px">Design a recipe</h1>
+<p style="max-width:660px;font-size:15px;color:color-mix(in srgb,var(--color-text) 62%,transparent)">Two numbers in — a volume and a strength — and the whole bench sheet comes out, with the arithmetic shown. Nothing is saved until you name it.</p>
+
+<div style="display:grid;grid-template-columns:minmax(300px,.85fr) minmax(0,1.15fr);gap:24px;align-items:start;margin-top:24px">
+
+<div style="display:flex;flex-direction:column;gap:18px">
+<div class="card elev-sm" style="padding:22px;gap:16px">
+<h2 style="font-size:21px;margin:0">Targets</h2>
+<div class="field"><label>Batch volume (gal)</label><input class="input" value="{{ dGal }}" onChange="{{ setGal }}" inputMode="decimal" style="min-height:42px;font-size:17px"><div style="margin-top:5px;font-size:12px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">Your carboys: 5, 6, 6.8.</div></div>
+<div class="field"><label>Target strength (% ABV)</label><input class="input" value="{{ dAbv }}" onChange="{{ setAbv }}" inputMode="decimal" style="min-height:42px;font-size:17px"><div style="margin-top:5px;font-size:12px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">If it ferments dry (FG 1.000). A sweet finish means less alcohol, not less honey.</div></div>
+<div class="field"><label>Yeast</label>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<sc-for list="{{ strains }}" as="s" hint-placeholder-count="5">
+<label class="tag" style="cursor:pointer;padding:7px 14px;font-size:13px;border:1px solid var(--color-divider);background:{{ s.bg }};color:{{ s.fg }}"><input type="radio" name="wbstrain" checked="{{ s.on }}" onChange="{{ s.pick }}" style="position:absolute;opacity:0;width:0;height:0">{{ s.name }}</label>
+</sc-for>
+</div>
+<div style="margin-top:6px;font-size:12px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">The strain sets the tolerance warning. Grams are worked out below, in whole sachets.</div>
+</div>
+<div class="field"><label>Nitrogen demand</label>
+<div class="seg">
+<sc-for list="{{ demands }}" as="d" hint-placeholder-count="3">
+<label class="seg-opt"><input type="radio" name="wbdemand" checked="{{ d.on }}" onChange="{{ d.pick }}">{{ d.name }}</label>
+</sc-for>
+</div>
+</div>
+<div class="field"><label>Fermaid O feedings</label><input class="input" value="{{ dAdds }}" onChange="{{ setAdds }}" inputMode="numeric" style="min-height:40px;width:88px;text-align:center;font-size:16px"><div style="margin-top:5px;font-size:12px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">TOSNA is 4: 24 h, 48 h, 72 h, then by the 1/3 break.</div></div>
+</div>
+
+<div class="card elev-sm" style="padding:22px;gap:12px">
+<h2 style="font-size:19px;margin:0">Keep it as a recipe</h2>
+<div class="field"><label>Name</label><input class="input" value="Orange Blossom Traditional" style="min-height:40px"></div>
+<div class="field"><label>Honey</label><input class="input" value="orange blossom" style="min-height:40px"><div style="margin-top:5px;font-size:12px;color:color-mix(in srgb,var(--color-text) 50%,transparent)">240 lb on hand. Wildflower: 600 lb.</div></div>
+<button class="btn btn-primary btn-block" style="min-height:44px">Save recipe</button>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:18px">
+<div class="card elev-sm" style="padding:24px;gap:14px">
+<div style="display:flex;align-items:baseline;gap:12px"><h2 style="font-size:23px;margin:0;flex:1">At {{ dGalText }} gal you'll need</h2><span class="tag tag-accent">{{ ogTag }}</span></div>
+<div style="display:grid;grid-template-columns:158px 1fr;gap:12px 20px">
+<sc-for list="{{ sheet }}" as="s" hint-placeholder-count="10">
+<span style="font-size:13.5px;padding-top:3px;color:color-mix(in srgb,var(--color-text) 58%,transparent)">{{ s.label }}</span>
+<span><span style="font-family:var(--font-heading);font-size:19px;line-height:1.2">{{ s.value }}</span><span style="font-size:13px;color:color-mix(in srgb,var(--color-text) 55%,transparent)"> {{ s.small }}</span><sc-if value="{{ showFormulas }}" hint-placeholder-val="{{ true }}"><span style="display:block;margin-top:2px;font-size:12px;line-height:1.45;color:color-mix(in srgb,var(--color-text) 45%,transparent)">{{ s.note }}</span></sc-if></span>
+</sc-for>
+</div>
+<sc-if value="{{ hasWarning }}" hint-placeholder-val="{{ true }}">
+<p style="margin:4px 0 0;padding:13px 17px;border-radius:20px;background:var(--color-accent-200);color:var(--color-accent-900);font-size:13.5px;line-height:1.5">{{ warning }}</p>
+</sc-if>
+</div>
+
+<div class="card elev-sm" style="padding:24px;gap:16px">
+<div style="display:flex;align-items:baseline;gap:12px"><h2 style="font-size:23px;margin:0;flex:1">Must day, in floor order</h2><span class="tag tag-accent-2">{{ mustTag }}</span></div>
+<ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:14px;counter-reset:wb">
+<sc-for list="{{ steps }}" as="st" hint-placeholder-count="5">
+<li style="display:flex;gap:14px;align-items:flex-start">
+<span style="flex:none;width:30px;height:30px;border-radius:50%;background:var(--color-accent-2-200);color:var(--color-accent-2-800);display:flex;align-items:center;justify-content:center;font-family:var(--font-heading);font-size:14px">{{ st.n }}</span>
+<span><span style="font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:color-mix(in srgb,var(--color-text) 55%,transparent)">{{ st.title }}</span><span style="display:block;font-family:var(--font-heading);font-size:21px;line-height:1.25">{{ st.value }}</span><span style="display:block;margin-top:3px;font-size:13px;line-height:1.5;color:color-mix(in srgb,var(--color-text) 58%,transparent)">{{ st.note }}</span></span>
+</li>
+</sc-for>
+</ol>
+
+<div style="padding:18px 20px;border-radius:24px;background:color-mix(in srgb,var(--color-accent) 9%,transparent);display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:18px;margin:0">Read it — before the yeast goes in</h3>
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+<div class="field" style="width:130px"><label>Hydrometer</label><input class="input" value="{{ chkReading }}" onChange="{{ setReading }}" onKeyDown="{{ keyCheck }}" placeholder="1.101" inputMode="decimal" style="min-height:42px;font-size:17px;text-align:center"></div>
+<div class="field" style="width:112px"><label>Sample °F</label><input class="input" value="{{ chkTemp }}" onChange="{{ setTemp }}" onKeyDown="{{ keyCheck }}" placeholder="76" inputMode="decimal" style="min-height:42px;font-size:17px;text-align:center"></div>
+<div class="field" style="width:96px"><label>pH</label><input class="input" value="{{ chkPh }}" onChange="{{ setPh }}" onKeyDown="{{ keyCheck }}" placeholder="3.9" inputMode="decimal" style="min-height:42px;font-size:17px;text-align:center"></div>
+<div class="field" style="width:132px"><label>Hydrometer cal. °F</label><input class="input" value="{{ chkCal }}" onChange="{{ setCal }}" onKeyDown="{{ keyCheck }}" inputMode="decimal" style="min-height:42px;font-size:17px;text-align:center"></div>
+<button class="btn btn-primary" onClick="{{ runCheck }}" style="min-height:42px;padding:0 22px">Check</button>
+</div>
+<sc-if value="{{ hasVerdict }}" hint-placeholder-val="{{ true }}">
+<div style="padding:15px 18px;border-radius:20px;background:{{ verdictBg }};color:{{ verdictFg }}">
+<sc-for list="{{ verdict }}" as="v" hint-placeholder-count="2">
+<p style="margin:0 0 7px;font-size:14.5px;line-height:1.55">{{ v.text }}</p>
+</sc-for>
+</div>
+</sc-if>
+<p style="margin:0;font-size:12px;color:color-mix(in srgb,var(--color-text) 48%,transparent)">The check writes nothing — re-read as many times as you like. Recording the pitch is the only write.</p>
+</div>
+
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+<button class="btn btn-primary" onClick="{{ recordMust }}" style="min-height:46px;padding:0 26px;font-size:15px">Record the must &amp; start the clock</button>
+<span style="font-size:12.5px;color:color-mix(in srgb,var(--color-text) 52%,transparent)">Writes {{ nextId }} with the corrected OG, what went in, and four dated feeds.</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;navStyle&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Top bar&quot;,&quot;Side rail&quot;],&quot;default&quot;:&quot;Top bar&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Shell&quot;},&quot;density&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Roomy&quot;,&quot;Tight&quot;],&quot;default&quot;:&quot;Roomy&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Shell&quot;},&quot;voice&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Cellar-mate&quot;,&quot;Terse&quot;],&quot;default&quot;:&quot;Cellar-mate&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Copy&quot;},&quot;showFormulas&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Copy&quot;}}">
+const DENS = t => 1.00130346 - 1.34722124e-4*t + 2.04052596e-6*t*t - 2.32820948e-9*t*t*t;
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const TODAY = new Date(2026, 8, 4, 9, 20);
+
+class Component extends DCLogic {
+  state = {
+    screen: "today", batchId: "B-2026-002", view: "ledger",
+    gal: "6", abv: "14", strain: "71B", demand: "medium", adds: "4",
+    chk: { reading: "", temp: "", ph: "", cal: "60" }, verdict: null,
+    entry: { reading: "", temp: "", note: "" }, banner: null,
+    extra: {}, drafts: {}, fed: {}, rowMsg: null
+  };
+
+  // ── rounding that matches Python's round() at the .5 boundary ──────────
+  r(x, dp) {
+    const f = Math.pow(10, dp), v = x * f, fl = Math.floor(v);
+    let out;
+    if (v - fl === 0.5) out = (fl % 2 === 0) ? fl : fl + 1;
+    else out = Math.round(v);
+    return out / f;
+  }
+  num(x, dp = 2) {
+    if (x === null || x === undefined || isNaN(x)) return "—";
+    return String(this.r(Number(x), dp)).replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+  }
+  pct(x) { return this.r(Number(x), 1).toFixed(1); }
+  sg(x) {
+    if (x === null || x === undefined || isNaN(x)) return "—";
+    return this.r(Number(x), 4).toFixed(4).replace(/(\.\d{3}\d*?)0+$/, "$1");
+  }
+  sg3(x) { return this.num(x, 3); }
+  lbOz(lb) {
+    const whole = Math.floor(lb), oz = Math.round((lb - whole) * 16);
+    if (whole < 1) return `${this.num(lb)} lb (${Math.round(lb * 16)} oz)`;
+    return `${this.num(lb)} lb (${whole} lb ${oz} oz)`;
+  }
+  galL(g) { return `${this.num(g)} gal (${(this.r(g * 3.785, 1)).toFixed(1)} L)`; }
+
+  // ── calc.py, ported ───────────────────────────────────────────────────
+  points(sg) { return (sg - 1) * 1000; }
+  abvOf(og, fg) { return this.r((og - fg) * 131.25, 2); }
+  ogForAbv(a, fg = 1) { return this.r(fg + a / 131.25, 4); }
+  honeyForOg(gal, og) { return this.r(this.points(og) * gal / 35, 2); }
+  honeyGal(lb) { return this.r(lb / 12, 2); }
+  waterGal(gal, lb) { return this.r(gal - this.honeyGal(lb), 2); }
+  expectedOg(lb, gal) { return this.r(1 + lb * 35 / gal / 1000, 4); }
+  yeastFor(gal, og) {
+    const rate = og > 1.1 ? 2 : 1, byRule = gal * rate;
+    const sach = Math.max(1, Math.round(byRule / 5 + 1e-9));
+    return { g: sach * 5, sachets: sach, rate, byRule: this.r(byRule, 1) };
+  }
+  goferm(g) { const gf = this.r(1.25 * g, 1); return { g: gf, ml: Math.round(20 * gf) }; }
+  yanPpm(a, demand) { return Math.round({ low: 9, medium: 12.5, high: 15 }[demand] * a); }
+  nutrientG(ppm, gal) { return this.r(ppm / 40 * gal, 1); }
+  split(total, n) { return this.r(total / n, 1); }
+  thirdBreak(og, fg = 1) { return this.r(og - (og - fg) / 3, 3); }
+  hydroCorrect(reading, sampleF, calF) { return this.r(reading * DENS(sampleF) / DENS(calF), 4); }
+  toleranceNote(strain, abv) {
+    const T = { "71B": [14, null], "D47": [14, "and it throws fusels above 70 °F"],
+      "QA23": [16, null], "EC-1118": [18, null], "K1V-1116": [18, null] }[strain];
+    if (!T || abv < T[0] - 0.5) return null;
+    return `${strain} is rated about ${T[0]} %. A ${this.num(abv, 1)} % target leaves it no margin${T[1] ? " " + T[1] : ""} — good nutrients and a cool cellar get it there, and it may finish a touch sweet. ${T[0] - 1} % is comfortable.`;
+  }
+  correction(og, target, gal, fg = 1, strain = "71B") {
+    const pts = this.r((target - og) * 1000, 1);
+    const carry = this.r(this.abvOf(og, fg), 1);
+    if (Math.abs(pts) <= 2) return { add: "none", pts, carry };
+    if (pts > 0) {
+      const lb = this.r(pts * gal / (35 - this.points(target) / 12), 2);
+      return { add: "honey", pts, lb, addsGal: this.r(lb / 12, 2), carry };
+    }
+    const over = -pts, w = this.r(gal * (this.points(og) / this.points(target) - 1), 2);
+    const tol = { "71B": 14, "D47": 14, "QA23": 16, "EC-1118": 18, "K1V-1116": 18 }[strain] || 99;
+    return { add: "water", pts: over, gal: w, newGal: this.r(gal + w, 2), carry, over: carry > tol };
+  }
+  phVerdict(ph) {
+    if (ph < 3.2) return { kind: "warn", text: `pH ${this.num(ph, 2)} — below the 3.2 floor; the yeast will struggle. Worth a carbonate addition before you pitch.` };
+    if (ph > 4.2) return { kind: "ok", text: `pH ${this.num(ph, 2)} — on the high side; normal for a fresh honey must, it drops once the yeast gets going.` };
+    if (ph >= 3.7) return { kind: "ok", text: `pH ${this.num(ph, 2)} — a happy must (3.7–4.2 is normal, 3.2 is the floor).` };
+    return { kind: "ok", text: `pH ${this.num(ph, 2)} — low side, fine.` };
+  }
+  plan(gal, abv, strain, demand, adds, fg = 1) {
+    const og = this.ogForAbv(abv, fg);
+    const honey = this.honeyForOg(gal, og);
+    const y = this.yeastFor(gal, og), gf = this.goferm(y.g);
+    const ppm = this.yanPpm(abv, demand), total = this.nutrientG(ppm, gal);
+    return { gal, abv, fg, og, honey, honeyGal: this.honeyGal(honey),
+      water: this.waterGal(gal, honey), perGal: this.r(honey / gal, 2),
+      yeast: y, goferm: gf, ppm, total, per: this.split(total, adds),
+      stop: this.thirdBreak(og, fg), adds, strain, demand };
+  }
+
+  // ── data ──────────────────────────────────────────────────────────────
+  batches = [
+    { id: "B-2026-001", name: "Wildflower Traditional", honey: "CT wildflower", gal: 5,
+      pitched: [2026, 6, 12, 14, 10], strain: "71B", og: 1.098, fg: 1.0, demand: "medium", adds: 4,
+      curve: [[0,1.098,68,"pitched, 10 g 71B + 12.5 g Go-Ferm"],[2,1.075,70,"vigorous"],[5,1.048,69,""],[9,1.022,68,"slowing"],[14,1.006,67,""],[24,1.001,66,"racked off the lees"],[41,1.001,64,"clear, tasted dry and bright"]],
+      state: "Ready to bottle", kind: "tag tag-accent-2", next: "1.001 since day 24 — bottle it", attn: null },
+    { id: "B-2026-002", name: "Blueberry Melomel", honey: "CT wildflower", gal: 6,
+      pitched: [2026, 7, 20, 15, 0], strain: "71B", og: 1.104, fg: 1.0, demand: "medium", adds: 4,
+      curve: [[0,1.104,72,"pitched 3:00 pm, 10 g 71B"],[1,1.098,74,"feed #1 in, krausen up"],[2,1.086,75,"feed #2"],[4,1.068,74,"feed #3 — past the 1/3 break, no more nitrogen"],[7,1.055,72,"fruit in, 8 lb blueberry"],[9,1.047,70,"pressed the fruit cap"],[11,1.041,69,"slowing right down"]],
+      state: "Slowing", kind: "tag tag-accent", next: "Last read 4 days ago at 1.041 — worth a check", attn: null },
+    { id: "B-2026-003", name: "Orange Blossom Traditional", honey: "orange blossom", gal: 6,
+      pitched: [2026, 8, 3, 15, 40], strain: "71B", og: 1.1029, targetOg: 1.1067, fg: 1.0, demand: "medium", adds: 4,
+      curve: [[0,1.1029,76,"read 1.101 at 76 °F; read low by 4, stirred and carried on"]],
+      state: "Feed due", kind: "tag tag-accent", next: "Fermaid O #1, 6.3 g, 3:40 pm today",
+      attn: { kicker: "Feeding due today", title: "6.3 g Fermaid O by 3:40 pm", body: "Addition #1 of 4, sized from the OG you actually measured (1.103), not the target. Stop at SG 1.069 whatever the calendar says.", cta: "Open the batch" } },
+    { id: "B-2026-004", name: "Wildflower Session", honey: "CT wildflower", gal: 5,
+      pitched: [2026, 7, 22, 11, 0], strain: "71B", og: 1.072, fg: 1.0, demand: "medium", adds: 3,
+      curve: [[0,1.072,70,"pitched, 5 g 71B"],[1,1.066,72,"feed #1"],[2,1.058,73,"feed #2"],[3,1.048,72,"feed #3"],[6,1.031,66,"cellar dropped to 61 °F overnight"],[11,1.030,63,"no movement"],[13,1.030,62,"no movement"]],
+      state: "Stalled", kind: "tag tag-accent", next: "1.030 for 7 days — 62 °F cellar",
+      attn: { kicker: "Stuck ferment", title: "1.030 for seven days", body: "Nitrogen is done (past the break), so the suspects are temperature and rousing. It has been reading 62 °F — 71B wants 65–72. Warm it, rouse it, and read again in 24 h.", cta: "Open the batch" } },
+    { id: "B-2026-005", name: "Orange Blossom Sparkling", honey: "orange blossom", gal: 5,
+      pitched: null, strain: "71B", og: 1.076, fg: 1.0, demand: "medium", adds: 4, curve: [],
+      state: "Must day Saturday", kind: "tag tag-neutral", next: "13.0 lb honey — nothing weighed yet", attn: null },
+    { id: "B-2026-006", name: "Cyser", honey: "CT wildflower", gal: 6,
+      pitched: [2026, 7, 5, 16, 30], strain: "D47", og: 1.092, fg: 1.0, demand: "medium", adds: 4,
+      curve: [[0,1.092,68,"pitched, cider + honey"],[2,1.074,69,""],[5,1.050,68,""],[9,1.028,67,""],[16,1.014,66,""],[26,1.012,64,"tastes like apple pie"]],
+      state: "Nearly dry", kind: "tag tag-accent-2", next: "Two points in ten days — call it done", attn: null },
+    { id: "B-2026-007", name: "Raspberry Melomel", honey: "CT wildflower", gal: 3,
+      pitched: [2026, 7, 13, 10, 0], strain: "71B", og: 1.088, fg: 1.0, demand: "medium", adds: 4,
+      curve: [[0,1.088,70,"pitched, small batch"],[1,1.081,71,"feed #1"],[3,1.062,72,"feeds #2 and #3"],[6,1.040,70,"raspberries in"],[11,1.020,68,""]],
+      state: "Reading is old", kind: "tag tag-accent", next: "Last read 11 days ago",
+      attn: { kicker: "Nothing logged since Aug 24", title: "Raspberry has gone quiet for 11 days", body: "It was at 1.020 and dropping. One gravity tells you whether it is finished or stuck — and the fruit has been on it a while.", cta: "Log a reading" } },
+    { id: "B-2026-008", name: "Orange Blossom Reserve", honey: "orange blossom", gal: 6,
+      pitched: [2026, 6, 30, 13, 45], strain: "EC-1118", og: 1.114, fg: 1.0, demand: "high", adds: 4,
+      curve: [[0,1.114,70,"pitched EC-1118 for the headroom"],[3,1.082,72,""],[7,1.048,71,""],[14,1.018,69,""],[28,1.008,66,"14.0 % and still creeping"],[33,1.008,65,""]],
+      state: "Quiet", hint: "", kind: "tag tag-accent-2", next: "Sitting at 1.008 — taste before racking", attn: null }
+  ];
+
+  // ── helpers over data ─────────────────────────────────────────────────
+  d(ba) { return ba.pitched ? new Date(ba.pitched[0], ba.pitched[1], ba.pitched[2], ba.pitched[3], ba.pitched[4]) : null; }
+  when(dt, withTime) {
+    const h = dt.getHours() % 12 || 12, ap = dt.getHours() < 12 ? "am" : "pm";
+    const mm = String(dt.getMinutes()).padStart(2, "0");
+    return `${DOW[dt.getDay()]} ${MON[dt.getMonth()]} ${dt.getDate()}` + (withTime ? `, ${h}:${mm} ${ap}` : "");
+  }
+  addDays(dt, days, hours) {
+    return new Date(dt.getTime() + days * 864e5 + (hours || 0) * 36e5);
+  }
+  log(ba) {
+    const own = (this.state.extra[ba.id] || []);
+    return ba.curve.concat(own).slice().sort((a, b) => a[0] - b[0]);
+  }
+  cur(ba) { const l = this.log(ba); return l.length ? l[l.length - 1] : null; }
+  dayOf(ba) {
+    const p = this.d(ba); if (!p) return "—";
+    return Math.max(0, Math.round((TODAY - p) / 864e5));
+  }
+  feedRows(ba) {
+    const p = this.d(ba); if (!p) return [];
+    const cur = this.cur(ba), og = cur ? ba.curve[0][1] : ba.og;
+    const ppm = this.yanPpm(this.abvOf(og, ba.fg), ba.demand);
+    const total = this.nutrientG(ppm, ba.gal), per = this.split(total, ba.adds);
+    const stop = this.thirdBreak(og, ba.fg);
+    return Array.from({ length: ba.adds }, (_, i) => {
+      const n = i + 1, last = n === ba.adds;
+      const due = last ? this.addDays(p, 7) : this.addDays(p, 0, 24 * n);
+      const auto = (this.log(ba).some(r => r[0] >= n && !last) || (last && this.log(ba).some(r => r[0] >= 7)));
+      const key = ba.id + ":" + n;
+      const done = this.state.fed[key] === undefined ? auto : this.state.fed[key];
+      return { n, per, total, ppm, stop, due, done, last };
+    });
+  }
+
+  // The next-action sentence, always derived from the log — never stored,
+  // so logging a reading changes what the app tells you to do.
+  nextFor(ba) {
+    if (!ba.pitched) {
+      const lb = this.honeyForOg(ba.gal, ba.og);
+      return `${this.lbOz(lb)} honey and ${this.galL(this.waterGal(ba.gal, lb))} water — nothing weighed yet.`;
+    }
+    const l = this.log(ba), c = l[l.length - 1];
+    if (!c) return ba.next;
+    const og = ba.curve.length ? ba.curve[0][1] : ba.og;
+    const prev = l[l.length - 2];
+    const age = Math.max(0, Math.round(this.dayOf(ba) - c[0]));
+    const span = prev ? c[0] - prev[0] : null;
+    const drop = prev ? this.r((prev[1] - c[1]) * 1000, 1) : null;
+    const at = this.sg(c[1]);
+    const days = n => `${n} day${n === 1 ? "" : "s"}`;
+    // one clause, no punctuation of its own — the sentence adds the connectors
+    const sameDay = span !== null && span < 1;
+    const over = sameDay ? "since the last reading today" : `in ${days(Math.round(span))}`;
+    const rise = drop !== null && drop < -0.5;
+    const move = drop === null ? null
+      : rise ? `it reads ${this.num(-drop, 1)} points higher than last time`
+        : (drop <= 0.5 ? `no change ${over}` : `${this.num(drop, 1)} points down ${over}`);
+    if (rise) return `${at} — ${move}. Stir it and re-read, or check the sample temperature: a rising gravity is usually the glass, not the mead.`;
+    const endOfDay = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), 23, 59);
+    const open = this.feedRows(ba).find(f => !f.done);
+    const due = open && open.due <= endOfDay ? open : null;
+    if (due) return `Fermaid O #${due.n}, ${this.num(due.per, 1)} g — due ${this.when(due.due, true)}. Stop at SG ${this.sg(due.stop)}.`;
+    // pitched today, or read today with a feeding still ahead: the feed is the
+    // next action, not another reading
+    if (open && (drop === null || age === 0)) {
+      const lead2 = drop === null
+        ? `Pitched ${age === 0 ? "today" : days(age) + " ago"} at ${at}`
+        : `Read today at ${at} — ${move}`;
+      return `${lead2}. Next up: Fermaid O #${open.n}, ${this.num(open.per, 1)} g ${this.when(open.due, true)}.`;
+    }
+    if (drop !== null && drop <= 1 && !sameDay && c[1] > ba.fg + 0.008)
+      return `Stuck at ${at} — ${move}. Nitrogen is done, so warm it and rouse it, then read again in 24 h.`;
+    if (c[1] <= ba.fg + 0.004)
+      return `${at} and steady at ${this.pct(this.abvOf(og, c[1]))} % — taste it, then rack it off the lees.`;
+    if (age >= 7)
+      return `Last read ${days(age)} ago at ${at}. One gravity says whether it is finished or stuck.`;
+    const lead = age === 0 ? `Read today at ${at}` : `Last read ${days(age)} ago at ${at}`;
+    const tail = age === 0
+      ? (drop !== null && drop <= 0.5
+        ? "Give it a day before the next reading."
+        : "Still moving — next reading in a couple of days.")
+      : "Worth another this week.";
+    return move ? `${lead} — ${move}. ${tail}` : `${lead}. ${tail}`;
+  }
+
+  // ── screens ───────────────────────────────────────────────────────────
+  set(k, v) { this.setState({ [k]: v }); }
+  open(id) { this.setState({ screen: "batch", batchId: id, view: "ledger", banner: null }); }
+
+  logReading(ba, raw, temp, note) {
+    if (!ba.pitched) {
+      this.setState({ banner: `${ba.id} hasn't been pitched yet — there's no clock to hang a reading on. Make the must first and the corrected OG is recorded with the pitch.` });
+      return;
+    }
+    const v = parseFloat(raw);
+    if (!v || v < 0.95 || v > 1.25) {
+      this.setState({ banner: `“${raw}” isn't a gravity between 0.950 and 1.250 — nothing was written.` });
+      return;
+    }
+    const t = parseFloat(temp);
+    const corrected = t ? this.hydroCorrect(v, t, 60) : v;
+    const prev = this.cur(ba);
+    // real elapsed days, not a whole day, so two readings the same afternoon
+    // get distinct times and a span that isn't zero
+    let day = (TODAY - this.d(ba)) / 864e5;
+    if (prev && day <= prev[0]) day = prev[0] + 0.02;
+    const extra = Object.assign({}, this.state.extra);
+    extra[ba.id] = (extra[ba.id] || []).concat([[day, corrected, t || 60, note || ""]]);
+    const og = ba.curve.length ? ba.curve[0][1] : ba.og;
+    const abv = this.r(this.abvOf(og, corrected), 1);
+    const att = Math.round((og - corrected) / (og - ba.fg) * 100);
+    const drop = prev ? this.r((prev[1] - corrected) * 1000, 1) : null;
+    let msg = `Logged ${this.sg(corrected)} on day ${Math.floor(day)}` + (t ? ` (read ${this.sg(v)} at ${this.num(t)} °F)` : "") + `. That's ${this.pct(abv)} % so far, ${att} % attenuated`;
+    const span = prev ? day - prev[0] : null;
+    if (drop === null) msg += ".";
+    else if (drop < 0) msg += `, ${this.num(-drop, 1)} points higher than ${this.sg(prev[1])} — stir it and re-read, or check the sample temperature.`;
+    else if (drop === 0) msg += `, no change since the previous reading${span < 1 ? " today" : ""}.`;
+    else msg += `, ${this.num(drop, 1)} points down since ${this.sg(prev[1])}.`;
+    // only a day apart or more is evidence of anything — a re-read half an
+    // hour later is expected to match
+    if (drop !== null && drop >= 0 && drop <= 1 && span >= 1) msg += " Two readings that close means it is done or it is stuck — taste it and check the temperature.";
+    else if (corrected <= ba.fg + 0.004) msg += " That is dry: time to think about racking.";
+    this.setState({ extra, banner: msg, entry: { reading: "", temp: "", note: "" }, drafts: Object.assign({}, this.state.drafts, { [ba.id]: "" }) });
+  }
+
+  runCheckNow() {
+    const c = this.state.chk, p = this.plan(parseFloat(this.state.gal) || 6, parseFloat(this.state.abv) || 12, this.state.strain, this.state.demand, parseInt(this.state.adds) || 4);
+    const lines = []; let kind = "ok";
+    const reading = parseFloat(c.reading), cal = parseFloat(c.cal) || 60, t = parseFloat(c.temp);
+    if (reading) {
+      let og = reading;
+      if (t) { og = this.hydroCorrect(reading, t, cal); lines.push(`OG ${this.sg(og)} (read ${this.sg(reading)} at ${this.num(t)} °F, hydrometer ${this.num(cal)} °F).`); }
+      else lines.push(`OG ${this.sg(og)} (as read — no sample temperature, so no correction).`);
+      const corr = this.correction(og, p.og, p.gal, p.fg, p.strain);
+      const target = this.sg(p.og);
+      if (corr.add === "none") lines.push(`On target — within 2 points of ${target}, which is hydrometer resolution. Carry on for about ${this.num(corr.carry, 1)} %.`);
+      else if (corr.add === "honey") { kind = "warn"; lines.push(`${this.num(corr.pts, 1)} points under ${target}. Make sure nothing is sitting on the bottom and re-read; if it still reads low, stir in ${this.lbOz(corr.lb)} honey — it adds about ${this.num(corr.addsGal)} gal — or carry on for about ${this.num(corr.carry, 1)} %.`); }
+      else { kind = "warn"; lines.push(`${this.num(corr.pts, 1)} points over ${target}. Add ${this.galL(corr.gal)} water and you'll land on ${target} at ${this.num(corr.newGal)} gal — check the carboy has the room — or let it ride at ~${this.num(corr.carry, 1)} %${corr.over ? `, past what ${p.strain} is rated for` : ""}.`); }
+    }
+    const ph = parseFloat(c.ph);
+    if (ph) { const v = this.phVerdict(ph); lines.push(v.text); if (v.kind === "warn") kind = "warn"; }
+    if (!lines.length) lines.push("Type what the glass says and I'll correct it for temperature and tell you what to stir in.");
+    this.setState({ verdict: { kind, lines } });
+  }
+
+  renderVals() {
+    const S = this.state;
+    const nav = this.props.navStyle ?? "Top bar";
+    const dense = (this.props.density ?? "Roomy") === "Tight";
+    const terse = (this.props.voice ?? "Cellar-mate") === "Terse";
+    const showFormulas = this.props.showFormulas ?? true;
+    const v = {
+      sideNav: nav === "Side rail", topNav: nav !== "Side rail", showFormulas,
+      atToday: S.screen === "today", atBatch: S.screen === "batch", atDesign: S.screen === "design",
+      goToday: () => this.setState({ screen: "today" }),
+      goBatch: () => this.setState({ screen: "batch" }),
+      goDesign: () => this.setState({ screen: "design" }),
+      // the tab returns you to the design you were working on; this starts a
+      // blank one — defaults back, check and verdict cleared
+      newDesign: () => this.setState({
+        screen: "design", gal: "6", abv: "12", strain: "71B", demand: "medium",
+        adds: "4", chk: { reading: "", temp: "", ph: "", cal: "60" }, verdict: null
+      })
+    };
+    v.navLinks = [["today", "Today"], ["batch", "In the cellar"], ["design", "Design & must"]]
+      .map(([k, label]) => ({
+        label, go: () => this.setState({ screen: k }),
+        line: S.screen === k ? "var(--color-accent)" : "transparent",
+        ink: S.screen === k ? "var(--color-accent)" : "inherit"
+      }));
+
+    // ── today ──
+    const live = this.batches.filter(b => b.pitched);
+    v.liveCount = `${live.length} going`;
+    v.dense = dense;
+    v.todayLede = terse
+      ? `${live.length} fermenting, 1 planned. 3 items need action.`
+      : "Three things want you today, and one of them has a clock on it. Everything else is just fermenting quietly.";
+    v.attention = this.batches.filter(b => b.attn).map(b => ({
+      id: b.id, kicker: b.attn.kicker, title: b.attn.title,
+      body: (terse || (S.extra[b.id] || []).length) ? this.nextFor(b) : b.attn.body,
+      cta: b.attn.cta, act: () => this.open(b.id)
+    }));
+    v.rows = this.batches.map(b => {
+      const l = this.log(b), c = this.cur(b);
+      const og = b.curve.length ? b.curve[0][1] : b.og;
+      const lastDay = c ? c[0] : null;
+      const spark = l.length > 1
+        ? l.map(p => `${this.r(6 + 74 * p[0] / Math.max(1, l[l.length-1][0]), 1)},${this.r(4 + 18 * (og - p[1]) / Math.max(0.001, og - 1.0), 1)}`).join(" ")
+        : "6,4 80,4";
+      return {
+        id: b.id, name: b.name, sub: `${this.num(b.gal)} gal · ${b.honey} · ${b.strain}`,
+        day: b.pitched ? this.dayOf(b) : "—",
+        sg: c ? this.sg(c[1]) : "—",
+        sgSub: c ? (lastDay === this.dayOf(b) ? "read today" : `day ${lastDay}`) : `OG ${this.sg(b.og)} planned`,
+        spark, state: b.state, tagCls: b.kind, next: terse ? "" : this.nextFor(b),
+        pitched: !!b.pitched, planned: !b.pitched,
+        makeMust: () => this.setState({ screen: "design", gal: this.num(b.gal), abv: this.num(this.abvOf(b.og, b.fg), 1), strain: b.strain, verdict: null }),
+        draft: S.drafts[b.id] || "",
+        type: e => this.setState({ drafts: Object.assign({}, S.drafts, { [b.id]: e.target.value }) }),
+        key: e => { if (e.key === "Enter") this.logReading(b, S.drafts[b.id], "", ""); },
+        log: () => { this.logReading(b, S.drafts[b.id], "", ""); this.setState({ screen: "batch", batchId: b.id }); },
+        open: () => this.open(b.id)
+      };
+    });
+
+    // ── batch ──
+    const ba = this.batches.find(x => x.id === S.batchId) || this.batches[1];
+    const l = this.log(ba), c = this.cur(ba);
+    const og = ba.curve.length ? ba.curve[0][1] : ba.og;
+    const pitch = this.d(ba);
+    const stop = this.thirdBreak(og, ba.fg);
+    v.b = {
+      id: ba.id, name: ba.name, volText: `${this.num(ba.gal)} gal`, strain: ba.strain,
+      pitchedText: pitch ? `pitched ${this.when(pitch, true)}` : "not pitched yet",
+      state: ba.state, tagCls: ba.kind,
+      sg: c ? this.sg(c[1]) : "—",
+      abvNow: c ? `${this.pct(this.abvOf(og, c[1]))} %` : "—",
+      att: c ? `${Math.round((og - c[1]) / (og - ba.fg) * 100)} %` : "—",
+      day: this.dayOf(ba),
+      nextLong: (ba.attn && !(S.extra[ba.id] || []).length && !terse)
+        ? ba.attn.body : this.nextFor(ba),
+      nextCta: ba.attn && ba.attn.cta === "Log a reading" ? "Log a reading" : "Log a reading",
+      feedHead: `Fermaid O, sized from OG ${this.sg(og)}`,
+      feedFoot: terse ? `Stop at SG ${this.sg(stop)}.` : `Stop at SG ${this.sg(stop)} whatever the calendar says. Nothing after this: late nitrogen feeds the wrong things.`
+    };
+    v.focusEntry = () => { const el = document.querySelector('input[placeholder="1.041"]'); if (el) el.focus(); };
+    v.viewLedger = S.view === "ledger"; v.viewCurve = S.view === "curve";
+    v.showLedger = () => this.set("view", "ledger"); v.showCurve = () => this.set("view", "curve");
+    v.entryReading = S.entry.reading; v.entryTemp = S.entry.temp; v.entryNote = S.entry.note;
+    v.typeReading = e => this.setState({ entry: Object.assign({}, S.entry, { reading: e.target.value }) });
+    v.typeTemp = e => this.setState({ entry: Object.assign({}, S.entry, { temp: e.target.value }) });
+    v.typeNote = e => this.setState({ entry: Object.assign({}, S.entry, { note: e.target.value }) });
+    v.addReading = () => this.logReading(ba, S.entry.reading, S.entry.temp, S.entry.note);
+    v.keyReading = e => { if (e.key === "Enter") v.addReading(); };
+    v.hasBanner = !!S.banner; v.banner = S.banner || "";
+
+    v.ledger = l.slice().reverse().map((row, i, arr) => {
+      const prev = arr[i + 1];
+      const dt = pitch ? this.addDays(pitch, row[0]) : TODAY;
+      return {
+        when: this.when(dt, true), day: Math.floor(row[0]), sg: this.sg(row[1]),
+        drop: prev
+          ? ((prev[1] - row[1]) < 0
+            ? `+${this.num((row[1] - prev[1]) * 1000, 1)} pts`
+            : `${this.num((prev[1] - row[1]) * 1000, 1)} pts`)
+          : "—",
+        abv: `${this.pct(this.abvOf(og, row[1]))} %`,
+        att: `${Math.round((og - row[1]) / (og - ba.fg) * 100)} %`,
+        note: row[3] || ""
+      };
+    });
+
+    // the domain is pitch → last scheduled feed at minimum, so a one-reading
+    // batch still plots against a real week instead of collapsing to day 1
+    const maxDay = Math.max(7, l.length ? l[l.length - 1][0] : 7);
+    const lo = 0.998, hi = og + 0.004;
+    const X = d => this.r(46 + 562 * d / maxDay, 1);
+    const Y = g => this.r(24 + 186 * (hi - g) / (hi - lo), 1);
+    v.curvePoints = l.map(p => `${X(p[0])},${Y(p[1])}`).join(" ");
+    v.curveDots = l.map(p => ({ x: X(p[0]), y: Y(p[1]) }));
+    v.gridLines = [og, og - (og - 1) / 3, 1 + (og - 1) / 3, 1.0].map(g => ({ y: Y(g), ty: Y(g) + 3.5, label: this.sg3(g) }));
+    v.breakY = Y(stop); v.breakLabelY = Y(stop) - 6; v.breakLabel = `1/3 break · SG ${this.sg(stop)}`;
+    const lastDay = l.length ? l[l.length - 1][0] : 0;
+    const nearLeft = X(lastDay) < 120;
+    v.lastAnchor = nearLeft ? "start" : "end";
+    v.lastX = X(lastDay) + (nearLeft ? 10 : -8);
+    v.lastLabelY = l.length ? Y(l[l.length - 1][1]) - 12 : 0;
+    v.feedMarks = this.feedRows(ba).map(f => ({
+      x: X(Math.min(maxDay, f.last ? 7 : f.n)), label: `#${f.n}`
+    }));
+
+    v.feeds = this.feedRows(ba).map(f => ({
+      g: `${this.num(f.per, 1)} g Fermaid O`,
+      when: f.last
+        ? `by ${this.when(f.due)} or SG ${this.sg(f.stop)}, whichever comes first`
+        : `${24 * f.n} h — ${this.when(f.due, true)}, or the 1/3 break if sooner`,
+      done: f.done, tag: f.done ? "in" : (f.due <= TODAY ? "due" : "waiting"),
+      tagCls: f.done ? "tag tag-accent-2" : (f.due <= TODAY ? "tag tag-accent" : "tag tag-neutral"),
+      toggle: () => this.setState({ fed: Object.assign({}, S.fed, { [ba.id + ":" + f.n]: !f.done }) })
+    }));
+
+    // what was WEIGHED comes from the design target, not from the reading —
+    // that is the whole point of the expected-vs-measured line below
+    const tOg = ba.targetOg || og;
+    const hLb = this.honeyForOg(ba.gal, tOg);
+    const added = { honey: hLb, water: this.waterGal(ba.gal, hLb) };
+    const y = this.yeastFor(ba.gal, tOg), gf = this.goferm(y.g);
+    v.mustFacts = [
+      { label: "Gravity in", value: c ? `OG ${this.sg(og)}` : "—", note: `${this.num(added.honey)} lb in ${this.num(ba.gal)} gal should read about ${this.sg(this.expectedOg(added.honey, ba.gal))} at 35 pts per lb per gal — lower than that and the honey ran light or wasn't mixed in yet` },
+      { label: "Honey", value: this.lbOz(added.honey), note: `${this.num(this.r(added.honey / ba.gal, 2))} lb/gal of ${ba.honey}` },
+      { label: "Water", value: this.galL(added.water), note: `the honey took the other ${this.num(this.honeyGal(added.honey))} gal` },
+      { label: "Yeast", value: `${this.num(y.g, 1)} g ${ba.strain}`, note: `${y.sachets} sachet${y.sachets === 1 ? "" : "s"} at ${this.num(y.rate, 1)} g per gal` },
+      { label: "Go-Ferm", value: `${this.num(gf.g, 1)} g in ${gf.ml} mL at 104 °F`, note: "1.25 g per g of yeast; 20 mL per g Go-Ferm" },
+      { label: "Target", value: `${this.num(this.abvOf(og, ba.fg), 1)} % if it finishes at ${this.sg(ba.fg)}`, note: `(OG − FG) × 131.25; the estimate drifts high above ~14 %` }
+    ];
+    v.outlook = [
+      { label: "If it goes dry", value: `${this.pct(this.abvOf(og, ba.fg))} %` },
+      { label: "Points left to 1.000", value: c ? `${this.num((c[1] - 1) * 1000, 0)} pts` : "—" },
+      { label: "Nitrogen stops at", value: `SG ${this.sg(stop)}` },
+      { label: "Fermaid O total", value: `${this.num(this.nutrientG(this.yanPpm(this.abvOf(og, ba.fg), ba.demand), ba.gal), 1)} g` }
+    ];
+    v.otherBatches = this.batches.filter(x => x.id !== ba.id).map(x => {
+      const cc = this.cur(x);
+      return { id: x.id, name: x.name, sg: cc ? this.sg(cc[1]) : "planned", open: () => this.open(x.id) };
+    });
+
+    // ── design & must ──
+    const gal = parseFloat(S.gal) || 6, abv = parseFloat(S.abv) || 12, adds = parseInt(S.adds) || 4;
+    const p = this.plan(gal, abv, S.strain, S.demand, adds);
+    v.dGal = S.gal; v.dAbv = S.abv; v.dAdds = S.adds; v.dGalText = this.num(gal);
+    v.setGal = e => this.set("gal", e.target.value);
+    v.setAbv = e => this.set("abv", e.target.value);
+    v.setAdds = e => this.set("adds", e.target.value);
+    v.strains = ["71B", "D47", "QA23", "EC-1118", "K1V-1116"].map(s => ({
+      name: s, on: S.strain === s, pick: () => this.set("strain", s),
+      bg: S.strain === s ? "var(--color-accent)" : "transparent",
+      fg: S.strain === s ? "var(--color-bg)" : "var(--color-text)"
+    }));
+    v.demands = ["low", "medium", "high"].map(d => ({ name: d, on: S.demand === d, pick: () => this.set("demand", d) }));
+    v.p = { og: this.sg(p.og) };
+    v.ogTag = `OG ${this.sg(p.og)}`;
+    v.mustTag = `${this.num(gal)} gal · next id B-2026-009`;
+    v.sheet = [
+      { label: "OG", value: this.sg(p.og), small: "", note: `1.000 + ${this.num(abv, 1)} ÷ 131.25` },
+      { label: "Honey", value: this.lbOz(p.honey), small: `${this.num(p.perGal)} lb/gal`, note: `${this.num(this.points(p.og), 1)} points × ${this.num(gal)} gal ÷ 35 pts per lb per gal — a planning figure; the hydrometer has the last word` },
+      { label: "Honey's own room", value: `~${this.num(p.honeyGal)} gal`, small: "", note: `${this.num(p.honey)} ÷ 12 lb per gal` },
+      { label: "Water", value: this.galL(p.water), small: `then top to the ${this.num(gal)} gal mark`, note: `${this.num(gal)} − ${this.num(p.honeyGal)}; the mark is the truth, this is where to start` },
+      { label: "Yeast", value: `${this.num(p.yeast.g, 1)} g ${p.strain}`, small: `(${p.yeast.sachets} sachet${p.yeast.sachets === 1 ? "" : "s"})`, note: `${this.num(p.yeast.rate, 1)} g per gal${p.og > 1.1 ? " above 1.100" : ""} = ${this.num(p.yeast.byRule, 1)} g, to the nearest 5 g sachet` },
+      { label: "Go-Ferm", value: `${this.num(p.goferm.g, 1)} g in ${p.goferm.ml} mL at 104 °F`, small: "", note: "1.25 g per g of yeast; 20 mL per g Go-Ferm. Twenty minutes, then temper with must until it's within 10 °F before they meet" },
+      { label: "YAN", value: `${p.ppm} ppm`, small: "", note: `${{ low: 9, medium: 12.5, high: 15 }[p.demand]} ppm per % ABV (${p.demand} demand) × ${this.num(abv, 1)}` },
+      { label: "Fermaid O", value: `${this.num(p.total, 1)} g`, small: `as ${adds} × ${this.num(p.per, 1)} g`, note: `${p.ppm} ÷ 40 ppm per g per gal × ${this.num(gal)} gal; at 24 h, 48 h, 72 h, last by day 7 or the 1/3 break` },
+      { label: "Stop nitrogen at", value: `SG ${this.sg(p.stop)}`, small: "", note: "OG − (OG − FG) ÷ 3 — nothing after this: late nitrogen feeds the wrong things" },
+      { label: "Expect", value: `${this.num(abv, 1)} % if it finishes at 1.000`, small: "", note: "(OG − FG) × 131.25; the estimate drifts high above ~14 %" }
+    ];
+    const warn = this.toleranceNote(p.strain, abv);
+    v.hasWarning = !!warn; v.warning = warn || "";
+    const cups = { 1: "one cup", 2: "two cups", 3: "three cups", 4: "four cups", 5: "five cups" }[adds] || `${adds} cups`;
+    v.steps = [
+      { n: 1, title: "Honey", value: this.lbOz(p.honey), note: "Don't boil it — a warm water bath if it's slow to pour." },
+      { n: 2, title: "Water", value: `start with ${this.galL(p.water)}`, note: `The honey takes the other ${this.num(p.honeyGal)} gal. Stir until it is one liquid, then top to the ${this.num(gal)} gal mark.` },
+      { n: 3, title: "Read it", value: "hydrometer and pH", note: "Before the yeast goes in — the form below does the arithmetic." },
+      { n: 4, title: "Rehydrate and pitch", value: `${p.goferm.ml} mL at 104 °F, ${this.num(p.goferm.g, 1)} g Go-Ferm, ${this.num(p.yeast.g, 1)} g ${p.strain}`, note: "Stir the Go-Ferm in, sprinkle the yeast on, wait 15–20 minutes. Temper with must in small doses until it's within 10 °F, then pitch." },
+      { n: 5, title: "Feed", value: `Fermaid O ${this.num(p.total, 1)} g as ${adds} × ${this.num(p.per, 1)} g`, note: `Weigh ${cups} now. 24 h, 48 h, 72 h, last by day 7 or the 1/3 break (SG ${this.sg(p.stop)}). Nothing after that: late nitrogen feeds the wrong things.` }
+    ];
+    v.chkReading = S.chk.reading; v.chkTemp = S.chk.temp; v.chkPh = S.chk.ph; v.chkCal = S.chk.cal;
+    const setChk = k => e => this.setState({ chk: Object.assign({}, S.chk, { [k]: e.target.value }) });
+    v.setReading = setChk("reading"); v.setTemp = setChk("temp"); v.setPh = setChk("ph"); v.setCal = setChk("cal");
+    v.runCheck = () => this.runCheckNow();
+    v.keyCheck = e => { if (e.key === "Enter") this.runCheckNow(); };
+    v.hasVerdict = !!S.verdict;
+    v.verdict = (S.verdict ? S.verdict.lines : []).map(t => ({ text: t }));
+    v.verdictBg = S.verdict && S.verdict.kind === "warn" ? "var(--color-accent-200)" : "var(--color-accent-2-200)";
+    v.verdictFg = S.verdict && S.verdict.kind === "warn" ? "var(--color-accent-900)" : "var(--color-accent-2-900)";
+    v.nextId = "B-2026-009";
+    v.recordMust = () => {
+      const id = "B-2026-009";
+      if (this.batches.some(b => b.id === id)) { this.open(id); return; }
+      const reading = parseFloat(S.chk.reading), t = parseFloat(S.chk.temp), cal = parseFloat(S.chk.cal) || 60;
+      const og = reading ? (t ? this.hydroCorrect(reading, t, cal) : reading) : p.og;
+      const ph = parseFloat(S.chk.ph) || null;
+      const pitchedAt = [2026, 8, 4, 9, 20];
+      const rec = {
+        id, name: "Orange Blossom Traditional", honey: "orange blossom", gal,
+        pitched: pitchedAt, strain: p.strain, og, targetOg: p.og, fg: p.fg, demand: p.demand, adds,
+        curve: [[0, og, t || cal, reading
+          ? `pitched ${this.num(p.yeast.g, 1)} g ${p.strain} + ${this.num(p.goferm.g, 1)} g Go-Ferm; read ${this.sg(reading)} at ${this.num(t || cal)} °F`
+          : `pitched ${this.num(p.yeast.g, 1)} g ${p.strain}; OG taken from the design sheet`]],
+        state: "Just pitched", kind: "tag tag-accent", next: "", attn: null
+      };
+      this.batches = this.batches.concat([rec]);
+      const first = this.feedRows(rec)[0];
+      const banner = `Recorded ${id} — ${this.num(gal)} gal, OG ${this.sg(og)}`
+        + (ph ? `, pH ${this.num(ph, 2)}` : "")
+        + `, ${this.num(p.yeast.g, 1)} g ${p.strain} pitched at 9:20 am. First Fermaid O `
+        + `${this.num(first.per, 1)} g ${this.when(first.due, true)}; stop at SG ${this.sg(this.thirdBreak(og, p.fg))}.`;
+      this.setState({ screen: "batch", batchId: id, view: "ledger", banner });
+    };
+    return v;
+  }
+}
+</script>
+</body>
+</html>

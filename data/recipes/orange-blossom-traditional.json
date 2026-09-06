@@ -1,0 +1,48 @@
+{
+  "additions": 4,
+  "computed": {
+    "abv": 14.0,
+    "abv_if_dry": 14.0,
+    "constants": {
+      "ABV_FACTOR": 131.25,
+      "GOFERM_G_PER_G_YEAST": 1.25,
+      "GOFERM_WATER_ML_PER_G": 20.0,
+      "HONEY_LB_PER_GAL": 12.0,
+      "PPG_PER_LB_HONEY": 35,
+      "YAN_PER_ABV.medium": 12.5,
+      "YAN_PPM_PER_G_PER_GAL.fermaid-o": 40.0
+    },
+    "goferm_g": 12.5,
+    "goferm_water_ml": 250,
+    "honey_gal": 1.52,
+    "honey_lb": 18.29,
+    "honey_lb_per_gal": 3.05,
+    "nutrient_g": 26.2,
+    "og": 1.1067,
+    "per_addition_g": 6.6,
+    "sachets": 2,
+    "third_break_sg": 1.071,
+    "warnings": [
+      "71B is rated about 14 %. A 14 % target leaves it no margin — good nutrients and a cool cellar get it there, and it may finish a touch sweet. 13 % is comfortable."
+    ],
+    "water_gal": 4.48,
+    "water_l": 17.0,
+    "yan_ppm": 175,
+    "yeast_g": 10.0
+  },
+  "demand": "medium",
+  "design_gal": 6.0,
+  "honey": "orange blossom",
+  "name": "Orange Blossom Traditional",
+  "notes": "",
+  "product": "fermaid-o",
+  "slug": "orange-blossom-traditional",
+  "strength": {
+    "abv": 14.0,
+    "by": "abv",
+    "fg": 1.0,
+    "og": null
+  },
+  "updated": "2026-09-03",
+  "yeast": "71B"
+}

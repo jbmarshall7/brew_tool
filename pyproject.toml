@@ -1,0 +1,8 @@
+# Metadata only — brew_tool is not built or published. Plain stdlib Python:
+# no dependencies, no build backend.
+[project]
+name = "brew-tool"
+version = "0.1.0"
+description = "Design mead recipes and make the must"
+requires-python = ">=3.9"
+dependencies = []
