@@ -55,7 +55,7 @@ class RecordTest(BatchTestCase):
         r = self.post(MUST, RECORD)
         self.assertEqual(r.status, 303)
         self.assertTrue(r.location.startswith("/batches/B-2026-003?msg="))
-        for piece in ("Recorded%20B-2026-003", "6%20gal", "OG%201.103",
+        for piece in ("Recorded%20B-2026-003", "6%20gal", "OG%201.1029",
                       "pH%203.9", "10%20g%2071B%20pitched%20at%203%3A40%20pm",
                       "First%20Fermaid%20O%206.3%20g%20Fri%20Sep%204",
                       "stop%20at%20SG%201.069"):
@@ -178,15 +178,17 @@ class PagesTest(BatchTestCase):
         body = r.body
         for expected in ("B-2026-003", "Orange Blossom Traditional",
                          "Thu Sep 3, 3:40 pm",
-                         "OG 1.103 (read 1.101 at 76 °F, hydrometer 60 °F) "
-                         "vs target 1.107",
+                         "OG 1.1029 (read 1.101 at 76 °F, hydrometer 60 °F) "
+                         "vs target 1.1067",
                          "18.3 lb honey", "10 g 71B", "12.5 g Go-Ferm",
                          "13.5 %", "25.3 g for 169 ppm YAN",
                          "Fri Sep 4, 3:40 pm", "Sat Sep 5, 3:40 pm",
                          "Sun Sep 6, 3:40 pm", "Thu Sep 10, 3:40 pm",
                          "Nothing after this", "read low by 4"):
             self.assertIn(expected, body, expected)
-        self.assertEqual(body.count("1.069"), 5)   # four rows + the stop line
+        # every feed row carries the stop gravity, not just the last one,
+        # plus the footer line — and the Next sentence may name it too
+        self.assertGreaterEqual(body.count("1.069"), 5)
         self.assertIn('href="/recipes/orange-blossom-traditional"', body)
 
     def test_unknown_batch_is_a_banner(self):
@@ -199,7 +201,7 @@ class PagesTest(BatchTestCase):
         r = self.get("/recipes/orange-blossom-traditional")
         self.assertIn("Musts recorded", r.body)
         self.assertIn('href="/batches/B-2026-003"', r.body)
-        self.assertIn("1.103", r.body)
+        self.assertIn("1.1029", r.body)
 
     def test_next_must_day_already_knows(self):
         self.post(MUST, dict(RECORD, cal_f="68", volume_gal="6.5"))
@@ -207,7 +209,7 @@ class PagesTest(BatchTestCase):
         # holds on any day the suite runs
         r = self.get(MUST, {"gal": "6", "pitched_at": "2026-09-10T09:00"})
         self.assertIn('name="cal_f" type="number" value="68"', r.body)
-        self.assertIn("last time B-2026-003 came in at 1.103", r.body)
+        self.assertIn("last time B-2026-003 came in at 1.1029", r.body)
         self.assertIn('name="id" type="text" value="B-2026-004"', r.body)
         r = self.get(MUST, {"gal": "6", "pitched_at": "2027-01-05T09:00"})
         self.assertIn('name="id" type="text" value="B-2027-001"', r.body)
@@ -253,7 +255,7 @@ class PagesTest(BatchTestCase):
         body = self.get(MUST, {"gal": "6", "reading": "1.101",
                                "temp_f": "76"}).body
         self.assertIn("Fermaid O 25.3 g as 4 × 6.3 g", body)
-        self.assertIn("Sized from your OG 1.103 at 6 gal", body)
+        self.assertIn("Sized from your OG 1.1029 at 6 gal", body)
         self.assertIn("(SG 1.069)", body)
         self.assertNotIn("6.6 g", body)
 

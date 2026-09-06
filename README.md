@@ -15,7 +15,12 @@ everything at once. This one does two jobs and does them in a few taps:
    you're on target and exactly what to stir in if not. Pitch, and it dates
    the feedings.
 
-No tracking beyond that. No inventory, no lots, no readings log — yet.
+3. **Watch it ferment** — log a gravity and the batch page derives the rest:
+   the drop since last time, the alcohol so far, how far it has attenuated,
+   and one sentence saying what to do next. Nothing here is a status you have
+   to keep up to date.
+
+No tracking beyond that. No inventory, no lots, no packaging — yet.
 
 ## Run it
 
@@ -38,7 +43,7 @@ library only, nothing to install.
 ```
 data/
   recipes/   one JSON file per recipe
-  batches/   one JSON file per must you recorded
+  batches/   one JSON file per must you recorded, and its readings
 ```
 
 Plain JSON, human-readable, versioned by git. Batch ids are `B-YYYY-NNN`;

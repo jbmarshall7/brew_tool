@@ -9,6 +9,7 @@ import os
 import re
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 
@@ -134,6 +135,31 @@ class Store:
     def save_batch(self, batch):
         self.write_json(self.batch_path(batch["id"]), batch)
         return batch
+
+    def add_reading(self, batch_id, reading, sample_f=None, cal_f=None,
+                    note="", at=None):
+        """Append one gravity to a batch. The corrected value is stored
+        alongside what the glass actually said, the way must day does it —
+        everything else the ledger shows is derived on render."""
+        from . import calc
+        batch = self.load_batch(batch_id)
+        reading = calc.num(reading, "hydrometer reading", 0.950, 1.250)
+        cal = (calc.DEFAULT_CAL_F if calc.blank(cal_f)
+               else calc.num(cal_f, "hydrometer calibration", 32, 110, " °F"))
+        if calc.blank(sample_f):
+            sample_f, corrected = None, reading
+        else:
+            sample_f = calc.num(sample_f, "sample temperature", 32, 140, " °F")
+            corrected = calc.hydro_correct(reading, sample_f, cal)
+        when = calc.parse_when(at) if at else datetime.now()
+        batch.setdefault("readings", []).append({
+            "at": calc.fmt_when(when), "reading": reading,
+            "sample_f": sample_f, "cal_f": cal, "sg": corrected,
+            "note": (note or "").strip(),
+        })
+        batch["readings"].sort(key=lambda r: r.get("at") or "")
+        self.save_batch(batch)
+        return batch, corrected
 
     def list_batches(self):
         out = self._read_all(self.batches_dir.glob("*.json"))

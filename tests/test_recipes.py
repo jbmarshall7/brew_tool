@@ -134,7 +134,7 @@ class PagesTest(RecipeTestCase):
         self.post("/recipes", OWNER)
         r = self.get("/recipes")
         self.assertIn("Orange Blossom Traditional", r.body)
-        self.assertIn("14 % · OG 1.107", r.body)
+        self.assertIn("14 % · OG 1.1067", r.body)
         r = self.get("/recipes/orange-blossom-traditional")
         self.assertEqual(r.status, 200)
         self.assertIn("18.29 lb", r.body)

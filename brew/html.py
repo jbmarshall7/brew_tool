@@ -196,6 +196,27 @@ a.btn:hover { background:var(--accent-600); color:var(--bg); }
 .panel .row input { text-align:center; }
 .panel .row button { margin-top:0; flex:none; white-space:nowrap; }
 
+/* — a batch's identity row: the id, then the four figures on sand — */
+.idrow { display:flex; flex-wrap:wrap; gap:16px; align-items:center;
+         justify-content:space-between; margin:4px 0 14px; }
+.idrow > div { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+.bid { font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+       color:var(--accent-700); }
+.stats { display:flex; gap:26px; flex-wrap:wrap; background:var(--surface);
+         border-radius:var(--r-card); padding:14px 22px; }
+.stats .l { display:block; font-size:11px; letter-spacing:.07em;
+            text-transform:uppercase; color:var(--mut); }
+.stats .n { display:block; font-family:var(--font-head); font-size:26px;
+            line-height:1.15; }
+
+/* — the one sentence that says what to do about this batch — */
+.nextbar { display:flex; gap:16px; align-items:center; flex-wrap:wrap;
+           background:var(--card); border-radius:var(--r-card);
+           padding:18px 22px; box-shadow:var(--shadow); margin:14px 0; }
+.nextbar b { font-family:var(--font-head); font-weight:400; font-size:15px;
+             color:var(--accent-800); }
+.nextbar > span { flex:1; min-width:220px; font-size:15.5px; }
+
 /* — banners — */
 .msg { padding:15px 20px; border-radius:var(--r-inner); margin:16px 0;
        white-space:pre-wrap; font-size:14.5px; line-height:1.55; border:none; }
@@ -264,7 +285,8 @@ ol.steps .mut { line-height:1.5; margin-top:3px; }
 }
 """
 
-NAV = [("/", "Design & must"), ("/recipes", "Recipes")]
+NAV = [("/batches", "In the cellar"), ("/", "Design & must"),
+       ("/recipes", "Recipes")]
 
 
 class raw(str):
@@ -416,7 +438,8 @@ def num(x, dp=2):
 
 
 def sg(x):
-    return f"{x:.3f}"
+    from .calc import sg_text
+    return sg_text(x)
 
 
 def lb_oz(lb):
