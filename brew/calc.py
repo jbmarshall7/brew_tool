@@ -488,25 +488,32 @@ def current_sg(batch):
     return (batch.get("measured") or {}).get("og")
 
 
-def next_feed(batch, now):
-    """(the next scheduled feeding, is the window shut).
+def feeds_given(batch):
+    """The numbers of the feedings actually recorded as given."""
+    return {f.get("n") for f in batch.get("feeds") or [] if f.get("n")}
 
-    Nothing is stored about whether a feed was actually given — the app
-    never asks for a status to keep up to date. This reports what the
-    schedule says, which is true either way, and it falls silent once the
-    gravity is past the 1/3 break, because nothing is fed after that.
+
+def next_feed(batch, now):
+    """(the next feeding still owed, is the window shut).
+
+    A feeding already recorded as given drops out. The window shuts for good
+    once the gravity is past the 1/3 break — nothing is fed after that,
+    whatever the calendar says, because late nitrogen feeds spoilage rather
+    than yeast.
     """
     nut = batch.get("nutrients") or {}
     stop, now_sg = nut.get("stop_sg"), current_sg(batch)
     if stop is not None and now_sg is not None and now_sg <= stop:
         return None, True
+    given = feeds_given(batch)
     for a in nut.get("additions") or []:
+        if a.get("n") in given:
+            continue
         try:
-            due = parse_when(a["due"])
+            parse_when(a["due"])
         except (ValueError, KeyError):
             continue
-        if due.date() >= now.date():
-            return a, False
+        return a, False
     return None, False
 
 
@@ -543,15 +550,20 @@ def next_action(batch, now=None, product="Fermaid O"):
     def ok(text):
         return {"kind": "ok", "text": text}
 
-    # 1 — a feeding due today beats everything the gravity is doing
+    # 1 — a feeding owed today or already late beats anything the gravity
+    # is doing; one still in the future is only worth a mention (rule 5)
     if feed is not None:
         due = parse_when(feed["due"])
-        if due.date() == now.date():
+        late = (now.date() - due.date()).days
+        if late >= 0:
+            whenever = ("due today at " + _clock(due).split(", ")[1]
+                        if late == 0 else
+                        f"was due {_clock(due)}, {late} day"
+                        f"{'s' if late != 1 else ''} ago")
             return warn(
-                f"{product} #{feed['n']}, {_g1(feed['g'])} g — due today at "
-                f"{_clock(due).split(', ')[1]}. Stop at SG "
-                f"{sg_text(feed.get('stop_sg') or stop)} whatever the "
-                "calendar says.")
+                f"{product} #{feed['n']}, {_g1(feed['g'])} g — {whenever}. "
+                f"Stop at SG {sg_text(feed.get('stop_sg') or stop)} whatever "
+                "the calendar says.")
 
     # 2 — at or below the target: a level, so one reading settles it
     if now_sg is not None and rows and now_sg <= fg + FINISHED_MARGIN:

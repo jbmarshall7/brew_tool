@@ -161,6 +161,30 @@ class Store:
         self.save_batch(batch)
         return batch, corrected
 
+    def record_feed(self, batch_id, n, at=None, note=""):
+        """Record that a scheduled feeding was actually given.
+
+        An event, not a status: append-only, like a reading, because whether
+        the nutrient went in is the one thing about the schedule the app
+        cannot derive. Nothing is ever un-ticked — a mistake is a note.
+        """
+        from . import calc
+        batch = self.load_batch(batch_id)
+        n = int(calc.num(n, "feeding number", 1, 99))
+        planned = [a for a in (batch.get("nutrients") or {}).get("additions")
+                   or [] if a.get("n") == n]
+        if not planned:
+            raise ValueError(f"{batch_id} has no feeding #{n}")
+        if any(f.get("n") == n for f in batch.get("feeds") or []):
+            raise ValueError(f"Feeding #{n} is already logged on {batch_id}")
+        when = calc.parse_when(at) if at else datetime.now()
+        batch.setdefault("feeds", []).append({
+            "n": n, "at": calc.fmt_when(when), "g": planned[0].get("g"),
+            "note": (note or "").strip()})
+        batch["feeds"].sort(key=lambda f: f.get("n") or 0)
+        self.save_batch(batch)
+        return batch, planned[0]
+
     def list_batches(self):
         out = self._read_all(self.batches_dir.glob("*.json"))
         return sorted(out, key=lambda b: (b.get("pitched_at") or "",

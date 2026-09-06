@@ -217,6 +217,11 @@ a.btn:hover { background:var(--accent-600); color:var(--bg); }
              color:var(--accent-800); }
 .nextbar > span { flex:1; min-width:220px; font-size:15.5px; }
 
+/* a one-control form inside a table row — the cheapest surface there is */
+form.mini { margin:0; display:flex; gap:6px; align-items:center; }
+form.mini button { margin-top:0; min-height:38px; padding:0 14px;
+                   font-size:13.5px; white-space:nowrap; }
+
 /* — banners — */
 .msg { padding:15px 20px; border-radius:var(--r-inner); margin:16px 0;
        white-space:pre-wrap; font-size:14.5px; line-height:1.55; border:none; }

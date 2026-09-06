@@ -30,7 +30,7 @@ MUST = "/recipes/orange-blossom-traditional/must"
 
 
 def batch(pitched="2026-09-03T15:40", readings=(), og=1.1029, fg=1.0,
-          stop=1.069, due=()):
+          stop=1.069, due=(), feeds=()):
     """A batch shaped like the file, built straight so a rule can be aimed at."""
     return {
         "id": "B-2026-003", "pitched_at": pitched,
@@ -41,6 +41,8 @@ def batch(pitched="2026-09-03T15:40", readings=(), og=1.1029, fg=1.0,
                                     for i, d in enumerate(due)]},
         "readings": [{"at": a, "sg": s, "reading": s, "sample_f": 68,
                       "cal_f": 60, "note": ""} for a, s in readings],
+        "feeds": [{"n": n, "at": "2026-09-0%dT16:00" % (n + 3), "g": 6.3,
+                   "note": ""} for n in feeds],
     }
 
 
@@ -91,11 +93,31 @@ class LedgerTest(unittest.TestCase):
 
 
 class NextActionTest(unittest.TestCase):
-    def test_1_a_feeding_due_today_outranks_everything(self):
-        a = act(batch(due=["2026-09-04T15:40", "2026-09-06T15:40"]))
+    DUE = ["2026-09-04T15:40", "2026-09-05T15:40", "2026-09-06T15:40",
+           "2026-09-10T15:40"]
+
+    def test_1_a_feeding_owed_outranks_everything(self):
+        # nothing logged: the first one is two days late and says so
+        a = act(batch(due=self.DUE))
         self.assertEqual(a["kind"], "warn")
-        self.assertIn("Fermaid O #2, 6.3 g — due today at 3:40 pm", a["text"])
+        self.assertIn("Fermaid O #1, 6.3 g — was due Fri Sep 4, 3:40 pm, "
+                      "2 days ago", a["text"])
         self.assertIn("Stop at SG 1.069", a["text"])
+
+    def test_1_a_logged_feeding_drops_out(self):
+        a = act(batch(due=self.DUE, feeds=(1, 2)))
+        self.assertIn("Fermaid O #3, 6.3 g — due today at 3:40 pm", a["text"])
+        # all four in: the schedule has nothing left to say
+        a = act(batch(due=self.DUE, feeds=(1, 2, 3),
+                      readings=[("2026-09-06T09:00", 1.085)]))
+        self.assertNotIn("due", a["text"])
+        self.assertIn("Next up: Fermaid O #4", a["text"])
+
+    def test_1_the_last_feeding_is_never_nagged_once_given(self):
+        b = batch(due=self.DUE, feeds=(1, 2, 3, 4),
+                  readings=[("2026-09-06T09:00", 1.085)])
+        self.assertEqual(calc.next_feed(b, NOW), (None, False))
+        self.assertNotIn("Fermaid O", act(b)["text"])
 
     def test_1_no_feeding_is_named_once_past_the_break(self):
         # nothing is fed after a third of the sugar is gone, whatever the
@@ -279,6 +301,52 @@ class BatchPageTest(LogTestCase):
         body = self.get("/batches/B-2026-003").body
         self.assertIn("No readings yet", body)
         self.assertIn('id="log"', body)
+
+
+class FeedLogTest(LogTestCase):
+    def test_recording_a_feed_is_an_event_not_a_tick(self):
+        b, planned = self.store.record_feed("B-2026-003", "1",
+                                            at="2026-09-04T16:00",
+                                            note="stirred in")
+        f = self.file()["feeds"][0]
+        self.assertEqual(f["n"], 1)
+        self.assertEqual(f["at"], "2026-09-04T16:00")
+        self.assertEqual(f["g"], 6.3)          # copied from the schedule
+        self.assertEqual(f["note"], "stirred in")
+        self.assertEqual(planned["n"], 1)
+
+    def test_the_same_feeding_cannot_be_logged_twice(self):
+        self.store.record_feed("B-2026-003", "2")
+        with self.assertRaisesRegex(ValueError, "already logged"):
+            self.store.record_feed("B-2026-003", "2")
+        self.assertEqual(len(self.file()["feeds"]), 1)
+
+    def test_a_feeding_that_is_not_on_the_schedule_is_refused(self):
+        with self.assertRaisesRegex(ValueError, "no feeding #9"):
+            self.store.record_feed("B-2026-003", "9")
+        self.assertIsNone(self.file().get("feeds"))
+
+    def test_the_route_lands_with_what_is_next(self):
+        r = self.post("/batches/B-2026-003/feed", {"n": "1"})
+        self.assertEqual(r.status, 303)
+        self.assertIn("Logged%20Fermaid%20O%20%231", r.location)
+        self.assertIn("6.3%20g", r.location)
+        self.assertEqual(len(self.file()["feeds"]), 1)
+
+    def test_a_double_tap_says_so_and_writes_nothing(self):
+        self.post("/batches/B-2026-003/feed", {"n": "1"})
+        r = self.post("/batches/B-2026-003/feed", {"n": "1"})
+        self.assertIn("already%20logged", r.location)
+        self.assertIn("kind=err", r.location)
+        self.assertEqual(len(self.file()["feeds"]), 1)
+
+    def test_the_row_offers_the_button_then_shows_when_it_went_in(self):
+        body = self.get("/batches/B-2026-003").body
+        self.assertIn("<button class=\"quiet\">I gave this</button>", body)
+        self.store.record_feed("B-2026-003", "1", at="2026-09-04T16:00")
+        body = self.get("/batches/B-2026-003").body
+        self.assertIn('pill ok">given', body)
+        self.assertIn("Fri Sep 4, 4:00 pm", body)
 
 
 class CellarListTest(LogTestCase):

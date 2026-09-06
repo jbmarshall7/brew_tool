@@ -26,30 +26,46 @@ def when(text):
 
 
 def feed_table(b, now=None):
-    """The dated feedings, each with what the schedule says about it now."""
+    """The dated feedings, what the schedule says about each, and a one-tap
+    way to record the one you just gave."""
     n = b.get("nutrients") or {}
     pname = product_name(n.get("product"))
     now = now or datetime.now()
     nxt, shut = calc.next_feed(b, now)
+    given = {f.get("n"): f for f in b.get("feeds") or []}
     rows = []
     for a in n.get("additions") or []:
+        num_ = a.get("n")
+        done = given.get(num_)
         try:
             due = calc.parse_when(a.get("due"))
-            if shut or due.date() < now.date():
-                state = "passed"
-            elif nxt is not None and a.get("n") == nxt.get("n") \
-                    and due.date() == now.date():
-                state = "due"
-            else:
-                state = "waiting"
         except ValueError:
-            state = "waiting"
-        rows.append([f"#{a.get('n', '')}", f"{num(a.get('g'), 1)} g {pname}",
-                     when(a.get("due")),
-                     raw(str(pill(state, "warn" if state == "due" else
-                                  "ok" if state == "passed" else ""))),
-                     a.get("rule") or ""])
-    return table(["", "Feed", "When", "", "Or sooner if"], rows,
+            due = None
+        if done:
+            state, kind = "given", "ok"
+        elif shut:
+            state, kind = "passed", ""
+        elif nxt is not None and num_ == nxt.get("n") and due is not None \
+                and due.date() <= now.date():
+            state, kind = "due", "warn"
+        else:
+            state, kind = "waiting", ""
+        if done:
+            action = raw(f'<span class="sub">{esc(when(done["at"]))}'
+                         + (f' · {esc(done["note"])}' if done.get("note")
+                            else "") + "</span>")
+        elif shut:
+            action = ""
+        else:
+            action = raw(
+                f'<form class="mini noprint" method="post" '
+                f'action="/batches/{esc(b["id"])}/feed">'
+                f'{hidden("n", str(num_))}'
+                f'<button class="quiet">I gave this</button></form>')
+        rows.append([f"#{num_}", f"{num(a.get('g'), 1)} g {pname}",
+                     when(a.get("due")), raw(str(pill(state, kind))),
+                     action, a.get("rule") or ""])
+    return table(["", "Feed", "When", "", "", "Or sooner if"], rows,
                  empty="No feeding schedule on this batch.")
 
 
@@ -221,6 +237,25 @@ def log_reading(req):
     return redirect(f"/batches/{batch_id}",
                     f"{said} — {', '.join(parts)}. {act['text']}",
                     "warn" if act["kind"] == "warn" else "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/feed")
+def log_feed(req):
+    """Record a feeding as given, then say what is next."""
+    batch_id = req.args[0]
+    try:
+        b, planned = req.store.record_feed(batch_id, req.form.get("n"),
+                                           note=req.form.get("note", ""))
+    except ValueError as e:
+        return redirect(f"/batches/{batch_id}", str(e), "err")
+    act = calc.next_action(
+        b, None, product_name((b.get("nutrients") or {}).get("product")))
+    pname = product_name((b.get("nutrients") or {}).get("product"))
+    return redirect(
+        f"/batches/{batch_id}",
+        f"Logged {pname} #{planned.get('n')} — {num(planned.get('g'), 1)} g. "
+        f"{act['text']}",
+        "warn" if act["kind"] == "warn" else "ok")
 
 
 @route("GET", "/batches")
