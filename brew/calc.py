@@ -544,11 +544,11 @@ def next_action(batch, now=None, product="Fermaid O"):
     now_sg = last["sg"] if last else og
     stop = (batch.get("nutrients") or {}).get("stop_sg")
 
-    def warn(text):
-        return {"kind": "warn", "text": text}
+    def warn(tag, text):
+        return {"kind": "warn", "tag": tag, "text": text}
 
-    def ok(text):
-        return {"kind": "ok", "text": text}
+    def ok(tag, text):
+        return {"kind": "ok", "tag": tag, "text": text}
 
     # 1 — a feeding owed today or already late beats anything the gravity
     # is doing; one still in the future is only worth a mention (rule 5)
@@ -561,13 +561,14 @@ def next_action(batch, now=None, product="Fermaid O"):
                         f"was due {_clock(due)}, {late} day"
                         f"{'s' if late != 1 else ''} ago")
             return warn(
+                "Feed due",
                 f"{product} #{feed['n']}, {_g1(feed['g'])} g — {whenever}. "
                 f"Stop at SG {sg_text(feed.get('stop_sg') or stop)} whatever "
                 "the calendar says.")
 
     # 2 — at or below the target: a level, so one reading settles it
     if now_sg is not None and rows and now_sg <= fg + FINISHED_MARGIN:
-        return ok(f"{sg_text(now_sg)} and steady at "
+        return ok("Ready to rack", f"{sg_text(now_sg)} and steady at "
                   f"{_g1(abv(og, now_sg))} % — taste it, then rack it off "
                   "the lees.")
 
@@ -575,6 +576,7 @@ def next_action(batch, now=None, product="Fermaid O"):
     if last is not None and last["drop"] is not None \
             and last["drop"] < -RISE_PTS:
         return warn(
+            "Reads high",
             f"{sg_text(last['sg'])} — it reads {_g1(-last['drop'])} points "
             "higher than last time. Stir it and re-read, or check the sample "
             "temperature: a rising gravity is usually the glass, not the mead.")
@@ -586,7 +588,7 @@ def next_action(batch, now=None, product="Fermaid O"):
             fix = ("Nitrogen is done, so warm it and rouse it, then read "
                    "again in 24 h." if past_break or feed is None else
                    "Check the temperature first, then rouse it.")
-            return warn(f"Stuck at {sg_text(last['sg'])} — no movement in "
+            return warn("Stalled", f"Stuck at {sg_text(last['sg'])} — no movement in "
                         f"{gap} day{'s' if gap != 1 else ''}. {fix}")
 
     # 5 — nothing to compare yet: no readings, or the only one is today's
@@ -602,26 +604,26 @@ def next_action(batch, now=None, product="Fermaid O"):
             opened = (f"Pitched at {sg_text(now_sg)}, "
                       f"{day_of(pitched, now)} days ago, and not read since.")
         if feed is not None:
-            return ok(f"{opened} Next up: {product} #{feed['n']}, "
+            return ok("Waiting", f"{opened} Next up: {product} #{feed['n']}, "
                       f"{_g1(feed['g'])} g {_clock(parse_when(feed['due']))}.")
-        return ok(f"{opened} A gravity in a day or two tells you where it is.")
+        return ok("Waiting", f"{opened} A gravity in a day or two tells you where it is.")
 
     # 6 — nobody has looked in a week
     stale = day_of(last["at"], now)
     if stale >= STALE_DAYS:
-        return warn(f"Last read {stale} days ago at {sg_text(last['sg'])}. "
+        return warn("Reading is old", f"Last read {stale} days ago at {sg_text(last['sg'])}. "
                     "One gravity says whether it is finished or stuck.")
 
     # 7 — it is simply working
     moved = last["drop"]
     if read_today:
         if moved and moved > STUCK_PTS:
-            return ok(f"{sg_text(last['sg'])}, {_g1(moved)} points down — "
+            return ok("Still moving", f"{sg_text(last['sg'])}, {_g1(moved)} points down — "
                       "still moving. Next reading in a couple of days.")
-        return ok(f"{sg_text(last['sg'])} — give it a day before the next "
+        return ok("Quiet", f"{sg_text(last['sg'])} — give it a day before the next "
                   "reading.")
     span = day_of(rows[-2]["at"], last["at"]) if len(rows) >= 2 else 0
     tail = (f" — {_g1(moved)} points down in {span} day"
             f"{'s' if span != 1 else ''}" if moved and span else "")
-    return ok(f"Last read {stale} day{'s' if stale != 1 else ''} ago at "
+    return ok("Quiet", f"Last read {stale} day{'s' if stale != 1 else ''} ago at "
               f"{sg_text(last['sg'])}{tail}. Worth another this week.")

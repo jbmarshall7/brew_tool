@@ -6,6 +6,26 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-06 — the rest of round 2: feeds, the curve, and Today.**
+  - **A feeding is recorded, because it is the one thing about the schedule
+    the app cannot derive.** An append-only `feeds[]` of `{n, at, g, note}`,
+    written by a button on the row. This is an *event*, like a reading — not
+    a status. A feeding logged drops out of the next-action sentence; one
+    still owed says how late it is; and the window still shuts for good past
+    the 1/3 break.
+  - **The gravity curve** is inline SVG rendered on the server (`chart.py`),
+    behind a Ledger/Curve toggle that is a GET param, so §7 still holds. The
+    same code draws the sparkline in a cellar row.
+  - **Today is the front door.** `/` is Today; the Design page moved to
+    `/design` and `/batches` redirects to `/`. Today carries the attention
+    cards, then the cellar table with a gravity field on every row, so the
+    daily job is one page load. On a phone each row stacks into a block with
+    its field full width — the table's sideways scroll was wrong for the one
+    device this is built for.
+
+  **Still out of scope:** everything in §9 below except the three above.
+
+
 - **2026-09-06 — the fermentation log (round 2, part one).** Batches carry a
   `readings[]` of `{at, reading, sample_f, cal_f, sg, note}` — a timestamp,
   not a day offset, so two readings the same afternoon stay apart. The batch

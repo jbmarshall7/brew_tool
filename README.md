@@ -15,10 +15,14 @@ everything at once. This one does two jobs and does them in a few taps:
    you're on target and exactly what to stir in if not. Pitch, and it dates
    the feedings.
 
-3. **Watch it ferment** — log a gravity and the batch page derives the rest:
+3. **Watch it ferment** — open the app and Today says which batches want
+   you and why, with a gravity field on every row. Log one and the rest is
+   derived:
    the drop since last time, the alcohol so far, how far it has attenuated,
-   and one sentence saying what to do next. Nothing here is a status you have
-   to keep up to date.
+   the drop since last time, the alcohol so far, how far it has attenuated,
+   and one sentence saying what to do next — with the whole ferment as a
+   curve when you want to see the shape of it. Nothing here is a status you
+   have to keep up to date.
 
 No tracking beyond that. No inventory, no lots, no packaging — yet.
 

@@ -15,7 +15,7 @@ def get(path, params=None):
 
 class DesignPageTest(unittest.TestCase):
     def test_first_load_is_already_an_answer(self):
-        r = get("/")
+        r = get("/design")
         self.assertEqual(r.status, 200)
         self.assertIn("At 6 gal you", r.body)
         self.assertIn("1.091", r.body)             # OG for 12 %
@@ -24,7 +24,7 @@ class DesignPageTest(unittest.TestCase):
         self.assertNotIn('name="yeast_g"', r.body)  # grams are derived
 
     def test_the_owners_batch(self):
-        r = get("/", {"gal": "6", "abv": "14"})
+        r = get("/design", {"gal": "6", "abv": "14"})
         for expected in ("18.29 lb (18 lb 5 oz)", "3.05 lb/gal", "~1.52 gal",
                          "4.48 gal (17.0 L)", "top to the 6 gal mark",
                          "10 g 71B", "(2 sachets)",
@@ -39,15 +39,15 @@ class DesignPageTest(unittest.TestCase):
         self.assertIn('class="msg warn"', r.body)
 
     def test_set_by_og_gives_the_same_sheet(self):
-        by_abv = get("/", {"gal": "6", "abv": "14"}).body
-        by_og = get("/", {"gal": "6", "abv": "", "og": "1.1067"}).body
+        by_abv = get("/design", {"gal": "6", "abv": "14"}).body
+        by_og = get("/design", {"gal": "6", "abv": "", "og": "1.1067"}).body
         self.assertIn("strength set by OG", by_og)
         self.assertNotIn("strength set by OG", by_abv)
         for expected in ("18.29 lb", "4.48 gal", "175 ppm", "SG 1.071"):
             self.assertIn(expected, by_og)
 
     def test_bad_input_keeps_the_form_and_says_why(self):
-        r = get("/", {"gal": "abc", "abv": "14"})
+        r = get("/design", {"gal": "abc", "abv": "14"})
         self.assertEqual(r.status, 200)
         self.assertIn('class="msg err"', r.body)
         self.assertIn("isn&#x27;t a number", r.body)
@@ -56,16 +56,16 @@ class DesignPageTest(unittest.TestCase):
         self.assertNotIn("you&#x27;ll need", r.body)
 
     def test_feed_text_follows_the_count(self):
-        r = get("/", {"gal": "6", "abv": "14", "additions": "5"})
+        r = get("/design", {"gal": "6", "abv": "14", "additions": "5"})
         self.assertIn("as 5 × 5.2 g", r.body)
         self.assertIn("at 24 h, 48 h, 72 h, 96 h, last by day 7 or the 1/3 "
                       "break (SG 1.071)", r.body)
-        r = get("/", {"gal": "6", "abv": "14", "additions": "1"})
+        r = get("/design", {"gal": "6", "abv": "14", "additions": "1"})
         self.assertIn("at 24 h after pitch, or the 1/3 break", r.body)
 
     def test_touch_targets(self):
         self.assertIn("min-height:44px", html.CSS)
-        r = get("/").body
+        r = get("/design").body
         self.assertIn('inputmode="decimal"', r)
         self.assertIn("<button>Recompute</button>", r)
 

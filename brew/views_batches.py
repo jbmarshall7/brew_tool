@@ -187,7 +187,7 @@ def batch(req):
              if b.get("notes") else "")
 
     head = (f'<p class="mut noprint" style="margin-bottom:2px">'
-            f'<a href="/batches">← All batches</a></p>'
+            f'<a href="/">← Today</a></p>'
             f'<div class="idrow"><div><span class="bid">{esc(b["id"])}</span>'
             f'{stats(b, now)}</div></div>'
             f'<div class="nextbar"><b>Next</b><span>{esc(act["text"])}</span>'
@@ -208,7 +208,7 @@ def batch(req):
             + f'<p class="mut">File: data/batches/{esc(b["id"])}.json — this '
               "page prints clean for the barrel.</p>")
     return Response(_page(f"{b['id']} — {r.get('name') or ''}", body,
-                          "/batches", req.params.get("msg"),
+                          "/", req.params.get("msg"),
                           req.params.get("kind", "ok")))
 
 
@@ -268,31 +268,5 @@ def log_feed(req):
 
 @route("GET", "/batches")
 def batches(req):
-    """Every batch, what it reads now, and the one thing each wants."""
-    now = datetime.now()
-    rows = []
-    for b in req.store.list_batches():
-        act = calc.next_action(
-            b, now, product_name((b.get("nutrients") or {}).get("product")))
-        r = b.get("recipe") or {}
-        now_sg = calc.current_sg(b)
-        rows.append([
-            raw(f'<a href="/batches/{esc(b["id"])}">{esc(b["id"])}</a>'
-                f'<span class="sub">{esc(r.get("name") or "")}</span>'),
-            str(calc.day_of(b["pitched_at"], now)),
-            sg(now_sg) if now_sg is not None else "—",
-            raw(f'{pill("needs you" if act["kind"] == "warn" else "quiet", act["kind"])}'
-                f'<span class="sub">{esc(act["text"])}</span>'),
-        ])
-    body = table(["Batch", "Day", "Gravity", "What it wants"], rows,
-                 empty="No musts recorded yet — design a recipe, then make "
-                       "the must.")
-    if not rows:
-        body += next_link("/", "Design a recipe")
-    else:
-        body += ('<p class="mut">Nothing here is a status you have to keep up '
-                 "to date — every line is derived from the readings and the "
-                 "pitch date.</p>")
-    return Response(_page("In the cellar", body, "/batches",
-                          req.params.get("msg"),
-                          req.params.get("kind", "ok")))
+    """The cellar list lives on Today — one table, not two."""
+    return redirect("/")

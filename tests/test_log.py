@@ -352,7 +352,7 @@ class FeedLogTest(LogTestCase):
 class CellarListTest(LogTestCase):
     def test_lists_every_batch_with_what_it_wants(self):
         self.store.add_reading("B-2026-003", "1.041", at="2026-09-11T09:00")
-        body = self.get("/batches").body
+        body = self.get("/").body
         self.assertIn('href="/batches/B-2026-003"', body)
         self.assertIn("Orange Blossom Traditional", body)
         self.assertIn("1.041", body)
@@ -361,9 +361,9 @@ class CellarListTest(LogTestCase):
     def test_empty_cellar_points_at_the_design_page(self):
         for f in (self.root / "batches").glob("*.json"):
             f.unlink()
-        body = self.get("/batches").body
-        self.assertIn("No musts recorded yet", body)
-        self.assertIn('href="/"', body)
+        body = self.get("/").body
+        self.assertIn("Nothing is fermenting", body)
+        self.assertIn('href="/design"', body)
 
 
 if __name__ == "__main__":
@@ -429,3 +429,66 @@ class CurveTest(LogTestCase):
         spark = sparkline(self.store.load_batch("B-2026-003"))
         self.assertIn("<polyline", spark)
         self.assertIn('width="86"', spark)
+
+
+class TodayTest(LogTestCase):
+    def test_a_quiet_cellar_says_so(self):
+        self.store.add_reading("B-2026-003", "1.088", at="2026-09-06T09:00")
+        for n in ("1", "2", "3", "4"):
+            self.store.record_feed("B-2026-003", n)
+        body = self.get("/").body
+        self.assertNotIn("Needs you now", body)
+        self.assertIn("just fermenting quietly", body)
+        self.assertIn("In the cellar", body)
+
+    def test_a_batch_that_wants_something_gets_a_card(self):
+        body = self.get("/").body
+        self.assertIn("Needs you now", body)
+        self.assertIn('<div class="attn">', body)
+        self.assertIn("Feed due", body)                  # the kicker
+        self.assertIn("Orange Blossom Traditional", body)
+        self.assertIn('href="/batches/B-2026-003"', body)
+
+    def test_every_row_takes_a_gravity(self):
+        body = self.get("/").body
+        self.assertIn('action="/batches/B-2026-003/reading"', body)
+        self.assertIn('id="sg-B-2026-003"', body)
+        self.assertIn("<button>Log</button>", body)
+        self.assertIn("type a gravity on any row", body)
+        self.assertIn("keep up to date", body)
+
+    def test_the_row_carries_the_trend_once_there_are_two(self):
+        body = self.get("/").body
+        self.assertNotIn("<polyline", body)
+        self.store.add_reading("B-2026-003", "1.088", at="2026-09-04T09:00")
+        self.store.add_reading("B-2026-003", "1.070", at="2026-09-06T09:00")
+        body = self.get("/").body
+        self.assertIn("<polyline", body)
+        self.assertIn("read today", body)
+
+    def test_what_needs_you_sorts_above_what_does_not(self):
+        # a second batch that is quietly working
+        dispatch(Request("POST", MUST, {},
+                         dict(RECORD, id="B-2026-004",
+                              pitched_at="2026-08-20T09:00"), (), self.store))
+        for n in ("1", "2", "3", "4"):
+            self.store.record_feed("B-2026-004", n)
+        self.store.add_reading("B-2026-004", "1.030",
+                               at="2026-09-06T08:00")
+        body = self.get("/").body
+        # the one with a feeding owed is named in a card; the quiet one is not
+        cards = body[body.index("Needs you now"):body.index("In the cellar")]
+        self.assertIn("B-2026-003", cards)
+        self.assertNotIn("B-2026-004", cards)
+        # ...and it sits above the quiet one in the table
+        self.assertLess(body.rindex("B-2026-003"), body.rindex("B-2026-004"))
+
+    def test_logging_from_a_row_lands_on_the_batch(self):
+        r = self.post("/batches/B-2026-003/reading", {"reading": "1.077"})
+        self.assertEqual(r.status, 303)
+        self.assertTrue(r.location.startswith("/batches/B-2026-003?msg="))
+
+    def test_batches_still_resolves(self):
+        r = self.get("/batches")
+        self.assertEqual(r.status, 303)
+        self.assertEqual(r.location, "/")
