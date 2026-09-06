@@ -170,11 +170,13 @@ a.btn:hover { background:var(--accent-600); color:var(--bg); }
 .tags label:focus-within { outline:2px solid var(--accent); outline-offset:2px; }
 .seg { display:inline-flex; overflow:hidden; margin-top:5px;
        border:1px solid var(--line); border-radius:999px; }
-.seg label { display:inline-flex; align-items:center; margin:0; cursor:pointer;
-       padding:0 18px; min-height:44px; font-size:13.5px; color:var(--ink); }
-.seg label + label { border-left:1px solid var(--line); }
-.seg label.on { background:var(--accent); color:var(--bg); }
-.seg label:not(.on):hover { background:rgba(32,30,29,.07); }
+.seg label, .seg a { display:inline-flex; align-items:center; margin:0;
+       cursor:pointer; padding:0 18px; min-height:44px; font-size:13.5px;
+       color:var(--ink); text-decoration:none; }
+.seg label + label, .seg a + a { border-left:1px solid var(--line); }
+.seg label.on, .seg a.on { background:var(--accent); color:var(--bg); }
+.seg label:not(.on):hover, .seg a:not(.on):hover
+       { background:rgba(32,30,29,.07); }
 .seg input { position:absolute; opacity:0; width:0; height:0;
        pointer-events:none; }
 .seg label:focus-within { outline:2px solid var(--accent); outline-offset:-2px; }
@@ -216,6 +218,8 @@ a.btn:hover { background:var(--accent-600); color:var(--bg); }
 .nextbar b { font-family:var(--font-head); font-weight:400; font-size:15px;
              color:var(--accent-800); }
 .nextbar > span { flex:1; min-width:220px; font-size:15.5px; }
+
+svg.curve { display:block; max-width:100%; height:auto; }
 
 /* a one-control form inside a table row — the cheapest surface there is */
 form.mini { margin:0; display:flex; gap:6px; align-items:center; }

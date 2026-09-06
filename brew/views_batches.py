@@ -11,6 +11,7 @@ from . import calc
 from .html import (banner, card, esc, field, hidden, kv, next_link, num,
                    page as _page, pill, raw, sg, table, textarea)
 from .server import Response, redirect, route
+from .chart import curve
 from .sheet import product_name
 
 
@@ -191,8 +192,15 @@ def batch(req):
             f'{stats(b, now)}</div></div>'
             f'<div class="nextbar"><b>Next</b><span>{esc(act["text"])}</span>'
             f'<a class="btn noprint" href="#log">Log a reading</a></div>')
+    view = "curve" if req.params.get("view") == "curve" else "ledger"
+    toggle = ('<div class="seg noprint">' + "".join(
+        f'<a href="/batches/{esc(b["id"])}?view={v}"'
+        f'{" class=on" if v == view else ""}>{esc(label)}</a>'
+        for v, label in (("ledger", "Ledger"), ("curve", "Curve")))
+        + "</div>")
+    seen = curve(b) if view == "curve" else ledger_table(b)
     body = (head + log_form(b["id"], req.params)
-            + f'<h2>The log</h2>{ledger_table(b)}'
+            + f'<div class="sheet-head"><h2>The log</h2>{toggle}</div>{seen}'
             + f'<h2>Must day, kept</h2>{card(facts)}'
             + feed + notes
             + next_link(f"/recipes/{esc(r.get('slug') or '')}",

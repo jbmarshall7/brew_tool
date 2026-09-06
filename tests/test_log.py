@@ -368,3 +368,64 @@ class CellarListTest(LogTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CurveTest(LogTestCase):
+    def readings(self, *pairs):
+        for at, sgv in pairs:
+            self.store.add_reading("B-2026-003", sgv, at=at)
+
+    def test_nothing_to_draw_says_so(self):
+        from brew.chart import curve
+        self.assertIn("starts at the first reading",
+                      curve(self.store.load_batch("B-2026-003")))
+
+    def test_the_curve_carries_the_break_line_and_the_feed_marks(self):
+        from brew.chart import curve
+        self.readings(("2026-09-04T09:00", "1.088"),
+                      ("2026-09-06T09:00", "1.070"))
+        svg = curve(self.store.load_batch("B-2026-003"))
+        self.assertIn("<svg", svg)
+        self.assertIn("<polyline", svg)
+        self.assertIn("1/3 break · SG 1.069", svg)
+        self.assertIn("stroke-dasharray", svg)
+        self.assertIn("1.070", svg)                  # the newest value named
+        for n in ("#1", "#2", "#3", "#4"):           # every scheduled feed
+            self.assertIn(f">{n}</text>", svg)
+        self.assertNotIn("<script", svg)
+
+    def test_one_reading_still_spans_a_week(self):
+        from brew.chart import curve
+        self.readings(("2026-09-04T09:00", "1.088"))
+        svg = curve(self.store.load_batch("B-2026-003"))
+        self.assertIn("day 7", svg)                  # not collapsed to a point
+        self.assertIn("<circle", svg)
+        self.assertNotIn("<polyline", svg)           # nothing to join yet
+
+    def test_a_logged_feed_mark_is_solid(self):
+        from brew.chart import curve
+        self.readings(("2026-09-04T09:00", "1.088"))
+        self.store.record_feed("B-2026-003", "1")
+        svg = curve(self.store.load_batch("B-2026-003"))
+        self.assertIn('stroke-opacity="1"', svg)     # given
+        self.assertIn('stroke-opacity=".35"', svg)   # still owed
+
+    def test_the_toggle_swaps_the_view(self):
+        self.readings(("2026-09-04T09:00", "1.088"),
+                      ("2026-09-06T09:00", "1.070"))
+        led = self.get("/batches/B-2026-003").body
+        self.assertIn("<th>Drop</th>", led)
+        self.assertIn('?view=curve"', led)
+        cur = self.get("/batches/B-2026-003", {"view": "curve"}).body
+        self.assertIn("<svg", cur)
+        self.assertNotIn("<th>Drop</th>", cur)
+        self.assertIn('?view=ledger"', cur)
+
+    def test_the_sparkline_needs_two_readings(self):
+        from brew.chart import sparkline
+        self.readings(("2026-09-04T09:00", "1.088"))
+        self.assertEqual(sparkline(self.store.load_batch("B-2026-003")), "")
+        self.readings(("2026-09-06T09:00", "1.070"))
+        spark = sparkline(self.store.load_batch("B-2026-003"))
+        self.assertIn("<polyline", spark)
+        self.assertIn('width="86"', spark)
