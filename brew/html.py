@@ -336,8 +336,8 @@ ol.steps .mut { line-height:1.5; margin-top:3px; }
 }
 """
 
-NAV = [("/", "Today"), ("/design", "Design & must"),
-       ("/recipes", "Recipes")]
+NAV = [("/", "Today"), ("/vessels", "Vessels"),
+       ("/design", "Design & must"), ("/recipes", "Recipes")]
 
 
 class raw(str):

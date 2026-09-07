@@ -767,6 +767,36 @@ def is_primed(batch):
     return bool(batch.get("primings"))
 
 
+def vessel_occupancy(vessels, batches, now=None):
+    """For each vessel, the batch that holds it now (if any) and where that
+    batch is. A vessel is free once its batch is bottled — the app never
+    fabricates a free-by date it cannot derive from the record.
+    """
+    from datetime import datetime as _dt
+    now = now or _dt.now()
+    # a batch holds a vessel if it names one and is not yet bottled
+    holding = {}
+    for b in batches:
+        v = (b.get("vessel") or "").strip()
+        if v and not is_bottled(b):
+            holding.setdefault(v.lower(), []).append(b)
+    out = []
+    for v in vessels:
+        keys = [str(v.get("name", "")).lower(), str(v.get("id", "")).lower()]
+        occ = []
+        for k in keys:
+            occ += holding.get(k, [])
+        rows = []
+        for b in occ:
+            act = next_action(b, now)
+            rows.append({"id": b["id"], "recipe": (b.get("recipe") or {}).get("name"),
+                         "sg": current_sg(b), "tag": act["tag"],
+                         "day": day_of(b["pitched_at"], now)
+                         if b.get("pitched_at") else None})
+        out.append({"vessel": v, "batches": rows, "free": not rows})
+    return out
+
+
 def flavors_in_contact(batch, now):
     """Oak and spice still in the mead, with how many days they have steeped.
 

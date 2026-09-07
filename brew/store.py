@@ -396,6 +396,39 @@ class Store:
         return sorted(out, key=lambda b: (b.get("pitched_at") or "",
                                           b.get("id") or ""), reverse=True)
 
+    # --- vessels: a flat list, occupancy derived from the batches ----------
+    def vessels_path(self):
+        return self.data / "vessels.json"
+
+    def list_vessels(self):
+        path = self.vessels_path()
+        if not path.exists():
+            return []
+        doc = self.read_json(path)
+        return doc.get("vessels", []) if isinstance(doc, dict) else []
+
+    def add_vessel(self, name, gal=None):
+        from . import calc
+        name = (name or "").strip()
+        if not name:
+            raise ValueError("give the vessel a name")
+        vessels = self.list_vessels()
+        if any(v.get("name", "").lower() == name.lower() for v in vessels):
+            raise ValueError(f"there is already a vessel called {name}")
+        vid = f"V-{max([int(v['id'].split('-')[1]) for v in vessels if v.get('id', '').startswith('V-') and v['id'].split('-')[1].isdigit()], default=0) + 1:03d}"
+        v = {"id": vid, "name": name}
+        if not calc.blank(gal):
+            v["gal"] = calc.num(gal, "capacity", 0.1, 10000, " gal")
+        vessels.append(v)
+        self.write_json(self.vessels_path(), {"vessels": vessels})
+        return v
+
+    def set_batch_vessel(self, batch_id, vessel):
+        batch = self.load_batch(batch_id)
+        batch["vessel"] = (vessel or "").strip()
+        self.save_batch(batch)
+        return batch
+
     def batches_for_recipe(self, slug):
         return [b for b in self.list_batches()
                 if (b.get("recipe") or {}).get("slug") == slug]
