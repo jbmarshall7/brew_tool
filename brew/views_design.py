@@ -122,12 +122,17 @@ def save_card(store, editing=None, params=None):
     name = params.get("name", editing["name"] if editing else "")
     honey = params.get("honey", editing.get("honey", "") if editing else "")
     notes = params.get("notes", editing.get("notes", "") if editing else "")
+    changelog = (field("changelog", "What changed? (kept as a version note)",
+                       params.get("changelog", ""),
+                       "e.g. raised the OG, switched to D47.", typ="text",
+                       required=True) if editing else "")
     return f"""<div class="card save">
 <h2>{"Keep the changes" if editing else "Keep it as a recipe"}</h2>
 {field("name", "Name", name, "The honey and the strength make a good one.", typ="text", required=True)}
 {field("honey", "Honey", honey, "Which honey this was designed around.", typ="text", attrs='list="honeys"')}
 <datalist id="honeys">{honey_list}</datalist>
 {textarea("notes", "Notes", notes, "Anything the sheet doesn't say: where the honey came from, what you'd change.")}
+{changelog}
 <button class="block" formmethod="post" formaction="/recipes">{esc(label)}</button></div>"""
 
 

@@ -129,6 +129,30 @@ def log_form(batch_id, params=None):
             "comes from the must record.</p></div></form>")
 
 
+def tasting_section(b):
+    """Tasting notes at the checkpoints that matter, newest first."""
+    bid = b["id"]
+    ts = sorted(b.get("tastings") or [], key=lambda t: t.get("at") or "",
+                reverse=True)
+    rows = [[when(t["at"]), t.get("stage", ""),
+             ("★" * t["overall"] + "☆" * (5 - t["overall"])
+              if t.get("overall") else "—"),
+             t.get("note") or ""] for t in ts]
+    tbl = table(["When", "Stage", "Score", "Note"], rows,
+                empty="No tastings yet — the recipe improves fastest when you "
+                      "write down what it tastes like.")
+    opts = "".join(f"<option>{esc(st)}</option>" for st in calc.TASTING_STAGES)
+    form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/tasting">
+<div class="grid">
+<span><label for="ts-stage">Stage</label><select id="ts-stage" name="stage">{opts}</select></span>
+<span>{field("overall", "Overall (1–5)", "", "Optional gut score.", step="1", id_="ts-score")}</span>
+</div>{field("note", "Note", "", "Aroma, flavor, what you'd change.", typ="text", id_="ts-note")}
+<button>Record tasting</button></form>"""
+    return (f'<h2>Tastings</h2>{tbl}'
+            + details("Record a tasting", f'<div class="inner">{form}</div>',
+                      open_=not ts))
+
+
 def flavor_section(b):
     """Fruit, spice and oak that went into this batch, with contact time and a
     way to pull what is still steeping."""
@@ -502,6 +526,7 @@ def batch(req):
             + f'<div class="sheet-head"><h2>The log</h2>{toggle}</div>{seen}'
             + finishing_card(b, req.params)
             + flavor_section(b)
+            + tasting_section(b)
             + f'<h2>Must day, kept</h2>{card(facts)}'
             + feed + notes
             + next_link(f"/recipes/{esc(r.get('slug') or '')}",
@@ -649,6 +674,20 @@ def bottle(req):
     return redirect(f"/batches/{bid}",
                     f"Bottled {pk['units']} × {pk['unit']}. That is the batch "
                     "done — nicely done.", "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/tasting")
+def tasting(req):
+    bid = req.args[0]
+    f = req.form
+    try:
+        b = req.store.record_tasting(bid, f.get("stage"), f.get("overall"),
+                                     f.get("note", ""))
+    except ValueError as e:
+        return redirect(f"/batches/{bid}", str(e), "err")
+    t = b["tastings"][-1]
+    return redirect(f"/batches/{bid}",
+                    f"Tasting noted at {t['stage']}.", "ok")
 
 
 @route("POST", r"/batches/(B-\d{4}-\d{3})/flavor")

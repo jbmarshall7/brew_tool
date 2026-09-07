@@ -338,7 +338,8 @@ def record(req):
         return bounce(str(e))
     batch = {
         "id": batch_id,
-        "recipe": {"slug": r["slug"], "name": r["name"]},
+        "recipe": {"slug": r["slug"], "name": r["name"],
+                   "version": r.get("version", 1)},
         "pitched_at": calc.fmt_when(pitched),
         "volume_gal": round(volume, 2),
         "yeast": p["strain"],

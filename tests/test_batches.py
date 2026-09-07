@@ -63,7 +63,8 @@ class RecordTest(BatchTestCase):
         doc = json.loads((self.root / "batches" / "B-2026-003.json").read_text())
         self.assertEqual(set(doc), EXPECTED_KEYS)
         self.assertEqual(doc["recipe"], {"slug": "orange-blossom-traditional",
-                                         "name": "Orange Blossom Traditional"})
+                                         "name": "Orange Blossom Traditional",
+                                         "version": 1})
         self.assertEqual(doc["pitched_at"], "2026-09-03T15:40")
         self.assertEqual(doc["volume_gal"], 6.0)
         self.assertEqual(doc["yeast"], "71B")

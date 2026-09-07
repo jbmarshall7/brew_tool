@@ -60,6 +60,8 @@ class SaveTest(RecipeTestCase):
         self.assertEqual(doc["yeast"], "71B")
         self.assertNotIn("yeast_g", doc)          # derived, not stored
         self.assertEqual(doc["design_gal"], 6.0)
+        self.assertEqual(doc["version"], 1)
+        self.assertEqual(doc["history"][0]["changelog"], "initial version")
         self.assertEqual(doc["strength"], {"by": "abv", "abv": 14.0,
                                            "og": None, "fg": 1.0})
         # honey weight lives only inside computed: the inputs are the recipe
@@ -111,16 +113,26 @@ class SaveTest(RecipeTestCase):
                           "orange-blossom-traditional.json").read_text())
         self.assertEqual(doc["strength"]["abv"], 14.0)   # untouched
 
-    def test_redesign_overwrites_in_place(self):
+    def test_redesign_versions_in_place(self):
         self.post("/recipes", OWNER)
+        # a redesign needs a changelog — that is the point of versions
         r = self.post("/recipes", dict(OWNER, abv="13", name="OB Trad 13",
+                                       from_slug="orange-blossom-traditional"))
+        self.assertTrue(r.location.startswith("/design?"))
+        self.assertIn("one%20line%20on%20what%20changed", r.location)
+        r = self.post("/recipes", dict(OWNER, abv="13", name="OB Trad 13",
+                                       changelog="dropped to 13 %",
                                        from_slug="orange-blossom-traditional"))
         self.assertTrue(r.location.startswith(
             "/recipes/orange-blossom-traditional?msg=Updated"))
         doc = json.loads((self.root / "recipes" /
                           "orange-blossom-traditional.json").read_text())
-        self.assertEqual(doc["strength"]["abv"], 13.0)
+        self.assertEqual(doc["strength"]["abv"], 13.0)     # current is the new one
         self.assertEqual(doc["name"], "OB Trad 13")
+        self.assertEqual(doc["version"], 2)
+        self.assertEqual([h["version"] for h in doc["history"]], [1, 2])
+        self.assertEqual(doc["history"][0]["strength"]["abv"], 14.0)  # v1 kept
+        self.assertEqual(doc["history"][1]["changelog"], "dropped to 13 %")
         self.assertEqual(len(list((self.root / "recipes").glob("*.json"))), 1)
 
 

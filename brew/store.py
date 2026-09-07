@@ -187,6 +187,27 @@ class Store:
 
     FLAVOR_KINDS = ("fruit", "spice", "oak", "other")
 
+    def record_tasting(self, batch_id, stage, overall=None, note="", at=None):
+        """A tasting note at a checkpoint. A log, not a dose — no guardrails,
+        just a record the recipe can learn from."""
+        from . import calc
+        batch = self.load_batch(batch_id)
+        stage = (stage or "").strip().lower()
+        if stage not in calc.TASTING_STAGES:
+            raise ValueError(f"'{stage}' isn't one of "
+                             f"{', '.join(calc.TASTING_STAGES)}")
+        entry = {"at": calc.fmt_when(calc.parse_when(at) if at
+                                     else datetime.now()),
+                 "stage": stage, "note": (note or "").strip()}
+        if not calc.blank(overall):
+            entry["overall"] = int(calc.num(overall, "overall (1-5)", 1, 5))
+        if not entry["note"] and "overall" not in entry:
+            raise ValueError("a tasting needs a score or a note")
+        batch.setdefault("tastings", []).append(entry)
+        batch["tastings"].sort(key=lambda t: t.get("at") or "")
+        self.save_batch(batch)
+        return batch
+
     def record_flavor(self, batch_id, kind, item, qty=None, unit="",
                       at=None, note=""):
         """Record a flavor addition — fruit, spice or oak going into the mead."""
