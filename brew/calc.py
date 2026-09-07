@@ -767,6 +767,26 @@ def is_primed(batch):
     return bool(batch.get("primings"))
 
 
+# where bottled mead goes — light channels, not the full TTB removal taxonomy
+# (that is the future operations report's job). "sample" is called out because
+# sample pours may or may not be a reportable loss, and the record lets the
+# operator decide rather than the tool.
+DISPO_KINDS = ("taproom", "sold", "gift", "sample", "breakage", "other")
+
+
+def units_disposed(batch):
+    return sum(d.get("qty", 0) for d in batch.get("dispositions") or [])
+
+
+def units_on_hand(batch):
+    """Bottles still on hand: what was bottled, less what has left."""
+    pk = batch.get("packaging") or {}
+    made = pk.get("units")
+    if made is None:
+        return None
+    return made - units_disposed(batch)
+
+
 def vessel_occupancy(vessels, batches, now=None):
     """For each vessel, the batch that holds it now (if any) and where that
     batch is. A vessel is free once its batch is bottled — the app never
@@ -891,9 +911,12 @@ def next_action(batch, now=None, product="Fermaid O"):
     # 0 — bottled: this batch is finished, nothing more to say
     if is_bottled(batch):
         pk = batch["packaging"]
+        oh = units_on_hand(batch)
+        left = (f" — {oh} on hand" if oh is not None and oh != pk.get("units")
+                else "")
         return ok("Bottled",
                   f"Bottled {pk.get('units')} × {esc_free(pk.get('unit'))} on "
-                  f"{_clock(parse_when(pk['at'])).rsplit(',', 1)[0]}. Done.")
+                  f"{_clock(parse_when(pk['at'])).rsplit(',', 1)[0]}{left}. Done.")
 
     # 1 — a feeding owed today or already late beats anything the gravity
     # is doing; one still in the future is only worth a mention (rule 5)

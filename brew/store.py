@@ -367,6 +367,31 @@ class Store:
         self.save_batch(batch)
         return batch, d
 
+    def record_disposition(self, batch_id, kind, qty, to="", at=None, note=""):
+        """Where some bottles went: a taproom pour, a sale, a gift, a sample,
+        breakage. On-hand is derived from what was bottled less these; you
+        cannot dispose of more than you made."""
+        from . import calc
+        batch = self.load_batch(batch_id)
+        if not calc.is_bottled(batch):
+            raise ValueError("nothing to dispose of yet — this batch isn't "
+                             "bottled")
+        kind = (kind or "").strip().lower()
+        if kind not in calc.DISPO_KINDS:
+            raise ValueError(f"'{kind}' isn't one of "
+                             f"{', '.join(calc.DISPO_KINDS)}")
+        qty = int(calc.num(qty, "how many", 1, 100000))
+        on_hand = calc.units_on_hand(batch)
+        if qty > on_hand:
+            raise ValueError(f"only {on_hand} on hand — cannot move {qty}")
+        batch.setdefault("dispositions", []).append(
+            {"at": calc.fmt_when(calc.parse_when(at) if at else datetime.now()),
+             "kind": kind, "qty": qty, "to": (to or "").strip(),
+             "note": (note or "").strip()})
+        batch["dispositions"].sort(key=lambda d: d.get("at") or "")
+        self.save_batch(batch)
+        return batch
+
     def record_bottling(self, batch_id, units, unit, at=None, note=""):
         """Bottle it: the terminal event. Units and the package they went in."""
         from . import calc
