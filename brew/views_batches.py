@@ -337,7 +337,7 @@ vessel — every dose below is per that gallon.</p>
         steps.append(_fin_step("Bottle", "", form))
 
     in_arc = (calc.is_racked(b) or calc.is_stabilized(b) or calc.is_sweetened(b)
-              or calc.is_bottled(b)
+              or calc.is_primed(b) or calc.is_bottled(b)
               or (now_sg is not None and b.get("readings")
                   and now_sg <= fg + calc.FINISHED_MARGIN))
     inner = f'<div class="finsteps">{"".join(steps)}</div>'
@@ -417,23 +417,44 @@ def _prime_action(b, params, vol):
             f"({num(d['grams_per_gal'])} g/gal). Bottle in pressure-rated "
             f"bottles only — champagne or heavy crown-cap glass. {taxline}",
             "warn" if d["over_still"] else "ok")
-        override = "" if not calc.is_stabilized(b) else details(
-            "It is stabilized, but I re-pitched fresh yeast",
-            '<div class="inner">' + field("override", "Reason (recorded)", "",
-            "e.g. pitched EC-1118 at bottling.", typ="text") + "</div>")
+        if calc.is_stabilized(b):
+            override = details(
+                "It is stabilized, but I re-pitched fresh yeast",
+                '<div class="inner">' + field("override", "Reason (recorded)",
+                "", "e.g. pitched EC-1118 at bottling.", typ="text") + "</div>")
+        elif not calc.is_stable(b):
+            override = details(
+                "It is not steady yet, but I know it is done",
+                '<div class="inner">' + field("override", "Reason (recorded)",
+                "", "e.g. confirmed flat by taste and a repeat reading.",
+                typ="text") + "</div>")
+        else:
+            override = ""
         rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/prime">
 {hidden("target_vols", num(d['target_vols']))}{hidden("temp_f", num(d['temp_f']))}
 {hidden("sugar", d['sugar'])}{field("note", "Note", "", None, typ="text")}{override}
 <button>Record priming</button></form>"""
-        return pre + rec
+        unsteady = ("" if calc.is_stable(b) or calc.is_stabilized(b) else
+                    banner("It has not held a steady gravity for a couple of "
+                           "days — priming a mead that is still fermenting "
+                           "over-carbonates and bursts bottles. Recording will "
+                           "ask for a reason.", "warn"))
+        return unsteady + pre + rec
     return _prime_form(b, vol)
 
 
 def _prime_form(b, vol):
     bid = b["id"]
-    warn = "" if not calc.is_stabilized(b) else banner(
-        "This mead is stabilized — the yeast is inhibited and will not "
-        "carbonate unless you re-pitch fresh yeast.", "warn")
+    warn = ""
+    if calc.is_stabilized(b):
+        warn = banner("This mead is stabilized — the yeast is inhibited and "
+                      "will not carbonate unless you re-pitch fresh yeast.",
+                      "warn")
+    elif not calc.is_stable(b):
+        warn = banner("It has not held a steady gravity for a couple of days "
+                      "yet — priming a mead that is still fermenting over-"
+                      "carbonates and bursts bottles. Preview the sugar anyway; "
+                      "recording it will ask for a reason.", "warn")
     opts = "".join(f"<option{' selected' if k == 'honey' else ''}>{k}</option>"
                    for k in calc.SUGAR_YIELD)
     return f"""{warn}<form class="inline" method="get" action="/batches/{esc(bid)}#finish">
