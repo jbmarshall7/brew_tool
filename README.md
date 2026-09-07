@@ -66,6 +66,14 @@ from elsewhere, type it the first time and the sequence carries on.
 python3 -m unittest discover -s tests
 ```
 
+## Where it's going
+
+`docs/SPECIFICATION.md` is the roadmap — the full capability surface of the old
+`meadery_tools` app, sorted into what belongs here and what deliberately never
+will, ordered by leverage for a one-person cellar. It is a menu to pull from one
+item at a time, not a plan to build. `docs/DESIGN.md` records what each round
+actually changed; `docs/BRIEF.md` is the original ask.
+
 ## The math
 
 Lives in `brew/calc.py`, with every constant and its source. Planning
