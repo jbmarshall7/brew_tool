@@ -414,29 +414,33 @@ not re-litigated every session.
 
 ### 6.2 The resulting order
 
+**Progress (2026-09-06):** items 1–5 are built and merged to `main` — the whole
+Near tier plus the two foundational Considered items (vessels, dispositions).
+Items 6–7 (the TTB operations report and the excise worksheets) are the heavy,
+licensed-operator remainder and are best taken as their own focused sessions,
+because they need Warblers' actual Connecticut filing cadence and rates as input.
+
 Leverage-ordered given the answers, with dependencies respected. Still a menu —
 one at a time, used on a real batch before the next — but this is the sequence
 absent a reason to depart from it.
 
-1. **Fruit, spice and oak additions** (was A1). Smallest, the math already
+1. **Fruit, spice and oak additions** (was A1). ✓ **Shipped** (round 4). Smallest, the math already
    exists unported, no dependency, and it unblocks a style the owner has tried
    to make. Build first.
-2. **Sparkling finishing branch** (from answer 4; the round-3 deferral). Extends
+2. **Sparkling finishing branch** (from answer 4). ✓ **Shipped** (round 5). Extends
    the finishing arc already built: a bottle-conditioning path that primes
    instead of stabilizing, computes priming sugar for a target volume of CO₂,
    and flags the sparkling tax class at design — deciding carbonation early,
    because it changes the excise rate the tax worksheet will later need.
-3. **Tasting notes** (was A3) and **recipe versioning** (was A2). Cheap memory
+3. **Tasting notes** and **recipe versioning**. ✓ **Shipped** (round 6). Cheap memory
    and iteration aids, most valuable *before* the cellar fills to eight batches
    nobody can hold in their head.
-4. **Vessel schedule** (was B1). Promoted by the 2→8 trajectory. Build as the
-   live-batch count passes roughly four; below that it is noise, at eight it
-   leads.
-5. **Dispositions, including samples** (was B2). The data foundation the
-   compliance layer stands on — where bottles and sample pours went, on-hand
-   derived. Needed for answer 2 and as the input to everything in 6–7.
+4. **Vessel schedule** (was B1). ✓ **Shipped** (round 7). A Vessels page with
+   derived occupancy — free / occupied-by, no fabricated free-by date.
+5. **Dispositions, including samples** (was B2). ✓ **Shipped** (round 8). Where
+   bottles and sample pours went, on-hand derived; the input to 6–7 below.
 6. **TTB Report of Wine Premises Operations** (was B4) and
-   **document-expiry surfacing** (the light half of C3). The licensed-operator
+   **document-expiry surfacing** (the light half of C3). ← **next.** The licensed-operator
    compliance layer, once dispositions feed it: the F 5120.17 lines derived from
    batches and dispositions, and permit/COA/insurance renewal dates surfaced on
    Today. A lapsed permit is a bad surprise the tool can prevent.
