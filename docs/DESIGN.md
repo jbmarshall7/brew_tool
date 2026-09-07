@@ -6,6 +6,20 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-06 — sparkling by bottle-conditioning (round 5, from answer 4).**
+  The finishing arc forks after racking: a still mead stabilizes then sweetens
+  or bottles dry; a sparkling one *primes* instead. A Carbonate step computes
+  the priming sugar for a target volume of CO₂ (`priming_sugar`, the standard
+  McGill formula with the temperature-dependent residual), previews it like the
+  stabilize dose, and flags the TTB tax class — crossing ~2 volumes
+  (0.392 g CO₂/100 mL, 27 CFR 24.10) makes it a sparkling/carbonated wine at
+  roughly triple the excise, which is why carbonation is decided here. The
+  guardrails are mutual: a stabilized mead cannot be primed (dead yeast won't
+  carbonate) and a primed mead cannot be stabilized, each overridable only with
+  a recorded reason. Bottling a primed mead carries the carbonation and tax
+  class onto the package record, ready for the future excise worksheets.
+
+
 - **2026-09-06 — fruit, spice and oak (round 4, roadmap A1).** The Design page
   can now make a melomel: give a fruit and a weight and the fruit's sugar comes
   off the target first, so the honey drops to match and the water drops for the
