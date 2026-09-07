@@ -38,6 +38,23 @@ TOSNA_HOURS = (24, 48, 72)       # additions 1-3, hours after pitch
 TOSNA_LAST_DAY = 7               # the last addition's cap, days after pitch
 ON_TARGET_PTS = 2.0              # within this of target = hydrometer resolution
 DEFAULT_CAL_F = 60               # most hydrometers; the form can override
+
+# --- finishing: racking, stabilizing, back-sweetening, bottling -------------
+KMETA_SO2_FRACTION = 0.576       # potassium metabisulfite is ~57.6% SO2
+MOLECULAR_SO2_TARGET = 0.8       # ppm molecular SO2, the common protection floor
+# Potassium sorbate: MoreWine/winemaking practice is 0.5 g/gal (~125 ppm) with
+# sulfite, stepped to 0.75 g/gal (~200 ppm) when the sorbate has to work
+# harder — high pH or low alcohol. It NEVER stops an active ferment, and does
+# nothing without SO2 beside it. Source: morewinemaking.com Sorbistat K notes.
+SORBATE_BASE_G_PER_GAL = 0.5
+SORBATE_HIGH_G_PER_GAL = 0.75
+SORBATE_HIGH_PH = 3.5
+SORBATE_LOW_ABV = 10.0
+# "stable" = the gravity has stopped moving: two readings a couple of days
+# apart that barely differ. Sulfite does not arrest a working ferment, so the
+# tool will not compute a stabilizing dose until this holds.
+STABLE_PTS = 2.0
+STABLE_DAYS = 2
 PH_FLOOR = 3.2
 PH_LOW_WATCH = 3.5               # below this it will likely crash in primary
 PH_NORMAL = (3.7, 4.2)
@@ -114,6 +131,60 @@ def hydro_correct(reading, sample_f, cal_f=60.0):
         return (1.00130346 - 1.34722124e-4 * t + 2.04052596e-6 * t * t
                 - 2.32820948e-9 * t * t * t)
     return round(reading * dens(sample_f) / dens(cal_f), 4)
+
+
+# --- finishing chemistry ----------------------------------------------------
+def molecular_so2_free_needed(ph, molecular_target=MOLECULAR_SO2_TARGET):
+    """Free SO2 (ppm) to reach a molecular-SO2 target at this pH.
+
+    molecular_fraction = 1 / (1 + 10^(pH - 1.81)); free = target / fraction.
+    Lower pH needs far less — the whole reason the dose is computed, not
+    guessed.
+    """
+    frac = 1.0 / (1.0 + 10 ** (ph - 1.81))
+    return molecular_target / frac, frac
+
+
+def kmeta_grams(gallons, free_so2_ppm):
+    """Grams of K-meta for a target free-SO2 addition. Ignores existing and
+    bound SO2 — measure free SO2 and top up for real work."""
+    liters = gallons * 3.785
+    mg_kmeta = (free_so2_ppm * liters) / KMETA_SO2_FRACTION
+    return round(mg_kmeta / 1000.0, 3)
+
+
+def sorbate_grams(gallons, ph, abv_now):
+    """Grams of potassium sorbate: the base rate, stepped up where sorbate is
+    weakest (high pH or low alcohol)."""
+    high = ph >= SORBATE_HIGH_PH or abv_now < SORBATE_LOW_ABV
+    rate = SORBATE_HIGH_G_PER_GAL if high else SORBATE_BASE_G_PER_GAL
+    g = round(rate * gallons, 2)
+    ppm = round(rate / 3.785 * 1000)
+    return {"g": g, "rate": rate, "ppm": ppm, "stepped_up": high}
+
+
+def stabilize_doses(gallons, ph, abv_now, molecular=MOLECULAR_SO2_TARGET):
+    """Both stabilizer doses at once — they are given together or not at all."""
+    free, frac = molecular_so2_free_needed(ph, molecular)
+    sorb = sorbate_grams(gallons, ph, abv_now)
+    return {
+        "gallons": round(gallons, 2), "ph": ph, "abv": round(abv_now, 1),
+        "molecular": molecular, "free_so2_ppm": round(free, 1),
+        "molecular_fraction": round(frac, 4),
+        "kmeta_g": kmeta_grams(gallons, free),
+        "sorbate_g": sorb["g"], "sorbate_ppm": sorb["ppm"],
+        "sorbate_rate": sorb["rate"], "sorbate_stepped_up": sorb["stepped_up"],
+    }
+
+
+def backsweeten_honey(gallons, from_sg, to_sg, ppg=PPG_PER_LB_HONEY):
+    """lb of honey to raise a stable mead from `from_sg` to `to_sg`."""
+    pts = points(to_sg) - points(from_sg)
+    if pts <= 0:
+        raise ValueError(f"{sg_text(to_sg)} isn't sweeter than "
+                         f"{sg_text(from_sg)} — back-sweetening only adds "
+                         "sugar")
+    return round(pts * gallons / ppg, 2)
 
 
 # --- honey and water --------------------------------------------------------
@@ -486,12 +557,61 @@ def ledger(og, pitched_at, readings):
 
 
 def current_sg(batch):
-    """The gravity as it stands: the last reading, else the must's OG."""
+    """The gravity as it stands: the sweetened target if the mead has been
+    back-sweetened since the last reading, else the last reading, else the OG."""
     rows = sorted(batch.get("readings") or [], key=lambda x: x.get("at") or "")
+    last_read = None
     for r in reversed(rows):
         if r.get("sg") is not None:
-            return r["sg"]
+            last_read = r
+            break
+    sweet = sorted(batch.get("sweetenings") or [], key=lambda x: x.get("at") or "")
+    if sweet and (last_read is None
+                  or (sweet[-1].get("at") or "") >= (last_read.get("at") or "")):
+        return sweet[-1].get("to_sg")
+    if last_read is not None:
+        return last_read["sg"]
     return (batch.get("measured") or {}).get("og")
+
+
+def current_volume(batch):
+    """Gallons in the vessel now: the last racking's measured volume, else the
+    volume the must was made to. Every downstream dose is per this gallon."""
+    racks = sorted(batch.get("rackings") or [], key=lambda x: x.get("at") or "")
+    if racks and racks[-1].get("volume_gal") is not None:
+        return racks[-1]["volume_gal"]
+    return batch.get("volume_gal")
+
+
+def is_stable(batch):
+    """Has the gravity stopped moving? Two readings STABLE_DAYS apart that
+    differ by no more than STABLE_PTS. Sulfite cannot arrest a live ferment,
+    so stabilizing waits on this."""
+    rows = sorted([r for r in batch.get("readings") or [] if r.get("sg")
+                   is not None and r.get("at")], key=lambda x: x["at"])
+    if len(rows) < 2:
+        return False
+    last = rows[-1]
+    for prior in reversed(rows[:-1]):
+        if day_of(prior["at"], last["at"]) >= STABLE_DAYS:
+            return abs(points(last["sg"]) - points(prior["sg"])) <= STABLE_PTS
+    return False
+
+
+def is_racked(batch):
+    return bool(batch.get("rackings"))
+
+
+def is_stabilized(batch):
+    return bool(batch.get("stabilizations"))
+
+
+def is_sweetened(batch):
+    return bool(batch.get("sweetenings"))
+
+
+def is_bottled(batch):
+    return bool(batch.get("packaging"))
 
 
 def feeds_given(batch):
@@ -521,6 +641,14 @@ def next_feed(batch, now):
             continue
         return a, False
     return None, False
+
+
+def esc_free(value):
+    """Bottling's unit is free text; every other value here is a number. This
+    keeps a stored unit from carrying markup into a page (the views escape
+    too, but next_action's text is interpolated in a few places)."""
+    return (str(value) if value is not None else "").replace("<", "").replace(
+        ">", "")
 
 
 def _clock(dt):
@@ -556,6 +684,13 @@ def next_action(batch, now=None, product="Fermaid O"):
     def ok(tag, text):
         return {"kind": "ok", "tag": tag, "text": text}
 
+    # 0 — bottled: this batch is finished, nothing more to say
+    if is_bottled(batch):
+        pk = batch["packaging"]
+        return ok("Bottled",
+                  f"Bottled {pk.get('units')} × {esc_free(pk.get('unit'))} on "
+                  f"{_clock(parse_when(pk['at'])).rsplit(',', 1)[0]}. Done.")
+
     # 1 — a feeding owed today or already late beats anything the gravity
     # is doing; one still in the future is only worth a mention (rule 5)
     if feed is not None:
@@ -572,11 +707,34 @@ def next_action(batch, now=None, product="Fermaid O"):
                 f"Stop at SG {sg_text(feed.get('stop_sg') or stop)} whatever "
                 "the calendar says.")
 
-    # 2 — at or below the target: a level, so one reading settles it
-    if now_sg is not None and rows and now_sg <= fg + FINISHED_MARGIN:
-        return ok("Ready to rack", f"{sg_text(now_sg)} and steady at "
-                  f"{_g1(abv(og, now_sg))} % — taste it, then rack it off "
-                  "the lees.")
+    # 2 — the finishing arc: once the mead is down and still (or already
+    # part-way through finishing), the next physical step outranks the
+    # gravity commentary. Checked most-complete-first.
+    finished = now_sg is not None and rows and now_sg <= fg + FINISHED_MARGIN
+    if finished or is_racked(batch) or is_stabilized(batch) \
+            or is_sweetened(batch):
+        if is_sweetened(batch):
+            sw = batch["sweetenings"][-1]
+            return ok("Ready to bottle",
+                      f"Sweetened to {sg_text(sw.get('to_sg'))}. Taste it, "
+                      "then bottle it.")
+        if is_stabilized(batch):
+            return ok("Ready to bottle",
+                      "Stabilized — sorbate and sulfite are in. Back-sweeten "
+                      "to taste now, or bottle it dry.")
+        if is_racked(batch):
+            if is_stable(batch):
+                return ok("Ready to stabilize",
+                          f"Racked and steady at {sg_text(now_sg)}. Stabilize "
+                          "with sorbate and sulfite before you sweeten, or "
+                          "bottle it dry.")
+            return ok("Settling",
+                      f"Racked at {sg_text(now_sg)}. Give it a few days flat "
+                      "before you stabilize — sulfite will not stop a mead "
+                      "that is still working.")
+        return ok("Ready to rack",
+                  f"{sg_text(now_sg)} and steady at {_g1(abv(og, now_sg))} % — "
+                  "when it falls clear, rack it off the lees.")
 
     # 3 — it reads higher than last time: suspect the glass, not the mead
     if last is not None and last["drop"] is not None \

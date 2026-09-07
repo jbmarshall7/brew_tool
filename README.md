@@ -24,7 +24,13 @@ everything at once. This one does two jobs and does them in a few taps:
    curve when you want to see the shape of it. Nothing here is a status you
    have to keep up to date.
 
-No tracking beyond that. No inventory, no lots, no packaging — yet.
+4. **Finish it** — when the gravity holds steady, the batch page walks
+   the back half: rack off the lees, stabilize (it computes the sulfite dose
+   from your pH and refuses to dose a mead that is still working), back-sweeten
+   to taste, and bottle. Each chemical addition previews its amount before you
+   commit.
+
+No tracking beyond that. No inventory, no lots, no packaging materials — yet.
 
 ## Run it
 
