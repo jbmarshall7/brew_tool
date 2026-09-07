@@ -6,6 +6,46 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-06 — the rest of round 2: feeds, the curve, and Today.**
+  - **A feeding is recorded, because it is the one thing about the schedule
+    the app cannot derive.** An append-only `feeds[]` of `{n, at, g, note}`,
+    written by a button on the row. This is an *event*, like a reading — not
+    a status. A feeding logged drops out of the next-action sentence; one
+    still owed says how late it is; and the window still shuts for good past
+    the 1/3 break.
+  - **The gravity curve** is inline SVG rendered on the server (`chart.py`),
+    behind a Ledger/Curve toggle that is a GET param, so §7 still holds. The
+    same code draws the sparkline in a cellar row.
+  - **Today is the front door.** `/` is Today; the Design page moved to
+    `/design` and `/batches` redirects to `/`. Today carries the attention
+    cards, then the cellar table with a gravity field on every row, so the
+    daily job is one page load. On a phone each row stacks into a block with
+    its field full width — the table's sideways scroll was wrong for the one
+    device this is built for.
+
+  **Still out of scope:** everything in §9 below except the three above.
+
+
+- **2026-09-06 — the fermentation log (round 2, part one).** Batches carry a
+  `readings[]` of `{at, reading, sample_f, cal_f, sg, note}` — a timestamp,
+  not a day offset, so two readings the same afternoon stay apart. The batch
+  page leads with four derived figures (now, ABV so far, attenuated, day),
+  one sentence saying what to do, and an always-open form that takes a
+  gravity. Drop, ABV and attenuation are computed on render, never stored:
+  one number in, three columns out. `/batches` lists the cellar with the same
+  sentence per row. Two things worth knowing:
+  - **No feed is ever named once the gravity is past the 1/3 break**, whatever
+    the calendar says, and no feeding state is stored — the schedule reports
+    what it says, which is true whether or not you fed it. There is still no
+    status to keep up to date.
+  - **Gravity now keeps a significant fourth decimal** (1.1029, but 1.030),
+    per the handoff's number-formatting rule. The must-day correction turns
+    on that digit, so rounding it away was losing information.
+
+  **Still out of scope:** the Today triage page, the gravity curve, and feed
+  tick-boxes.
+
+
 - **2026-09-04 — the Organic look, from `design_handoff_brew_tool_ui/`.**
   Warm cream ground, terracotta accent, sage second voice, Caprasimo over
   Figtree, pill controls and soft-shadowed cards. The Design page is two

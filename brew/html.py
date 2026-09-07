@@ -68,6 +68,8 @@ header nav a:hover { color:var(--accent-700); }
 header nav a.active { color:var(--accent); border-bottom-color:var(--accent); }
 
 main { max-width:980px; margin:0 auto; padding:26px 26px 90px; }
+/* Today lays six columns across; the design draws it at 1240 */
+main.wide { max-width:1240px; }
 h1 { font-size:38px; margin:10px 0 6px; }
 h2 { font-size:23px; margin:30px 0 10px; padding-bottom:0; border:none; }
 a { color:var(--accent-700); text-underline-offset:3px; }
@@ -170,11 +172,13 @@ a.btn:hover { background:var(--accent-600); color:var(--bg); }
 .tags label:focus-within { outline:2px solid var(--accent); outline-offset:2px; }
 .seg { display:inline-flex; overflow:hidden; margin-top:5px;
        border:1px solid var(--line); border-radius:999px; }
-.seg label { display:inline-flex; align-items:center; margin:0; cursor:pointer;
-       padding:0 18px; min-height:44px; font-size:13.5px; color:var(--ink); }
-.seg label + label { border-left:1px solid var(--line); }
-.seg label.on { background:var(--accent); color:var(--bg); }
-.seg label:not(.on):hover { background:rgba(32,30,29,.07); }
+.seg label, .seg a { display:inline-flex; align-items:center; margin:0;
+       cursor:pointer; padding:0 18px; min-height:44px; font-size:13.5px;
+       color:var(--ink); text-decoration:none; }
+.seg label + label, .seg a + a { border-left:1px solid var(--line); }
+.seg label.on, .seg a.on { background:var(--accent); color:var(--bg); }
+.seg label:not(.on):hover, .seg a:not(.on):hover
+       { background:rgba(32,30,29,.07); }
 .seg input { position:absolute; opacity:0; width:0; height:0;
        pointer-events:none; }
 .seg label:focus-within { outline:2px solid var(--accent); outline-offset:-2px; }
@@ -195,6 +199,54 @@ a.btn:hover { background:var(--accent-600); color:var(--bg); }
 .panel .row label { margin-top:0; }
 .panel .row input { text-align:center; }
 .panel .row button { margin-top:0; flex:none; white-space:nowrap; }
+
+/* — a batch's identity row: the id, then the four figures on sand — */
+.idrow { display:flex; flex-wrap:wrap; gap:16px; align-items:center;
+         justify-content:space-between; margin:4px 0 14px; }
+.idrow > div { display:flex; flex-wrap:wrap; gap:14px; align-items:center; }
+.bid { font-size:12px; letter-spacing:.08em; text-transform:uppercase;
+       color:var(--accent-700); }
+.stats { display:flex; gap:26px; flex-wrap:wrap; background:var(--surface);
+         border-radius:var(--r-card); padding:14px 22px; }
+.stats .l { display:block; font-size:11px; letter-spacing:.07em;
+            text-transform:uppercase; color:var(--mut); }
+.stats .n { display:block; font-family:var(--font-head); font-size:26px;
+            line-height:1.15; }
+
+/* — the one sentence that says what to do about this batch — */
+.nextbar { display:flex; gap:16px; align-items:center; flex-wrap:wrap;
+           background:var(--card); border-radius:var(--r-card);
+           padding:18px 22px; box-shadow:var(--shadow); margin:14px 0; }
+.nextbar b { font-family:var(--font-head); font-weight:400; font-size:15px;
+             color:var(--accent-800); }
+.nextbar > span { flex:1; min-width:220px; font-size:15.5px; }
+
+svg.curve { display:block; max-width:100%; height:auto; }
+
+/* a one-control form inside a table row — the cheapest surface there is */
+form.mini { margin:0; display:flex; gap:6px; align-items:center; }
+form.mini input { width:92px; min-width:92px; max-width:92px; min-height:38px;
+                  padding:0 12px; font-size:15px; text-align:center; }
+form.mini label { display:none; }
+form.mini button { margin-top:0; min-height:38px; padding:0 14px;
+                   font-size:13.5px; white-space:nowrap; }
+
+/* the cellar table: identity on one line, the sentence takes the slack */
+.cellar td:first-child, .cellar th:first-child { white-space:nowrap; }
+.cellar td:nth-child(5) { min-width:230px; }
+
+/* — Today: the cards for what wants you, above the cellar table — */
+.attns { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr));
+         gap:16px; margin:12px 0 4px; }
+.attn { background:var(--accent-100); border-radius:32px; padding:20px 22px;
+        box-shadow:var(--shadow); }
+.attn .kick { font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+              color:var(--accent-700); }
+.attn h3 { font-size:19px; margin:6px 0 8px; }
+.attn p { margin:0; font-size:13.5px; line-height:1.5; opacity:.78; }
+.attn p.foot { margin-top:14px; display:flex; align-items:center; gap:12px;
+               flex-wrap:wrap; }
+.attn .mut { font-size:11.5px; }
 
 /* — banners — */
 .msg { padding:15px 20px; border-radius:var(--r-inner); margin:16px 0;
@@ -252,6 +304,26 @@ ol.steps .mut { line-height:1.5; margin-top:3px; }
 @media (max-width:860px) {
   .cols { grid-template-columns:1fr; }
 }
+@media (max-width:720px) {
+  /* the cellar is the daily job, and the daily job happens on a phone, so
+     each batch becomes a block with its gravity field at the bottom rather
+     than a row four columns of sideways scrolling wide */
+  .cellar table, .cellar tbody, .cellar tr, .cellar td { display:block;
+        width:100%; }
+  .cellar thead { display:none; }
+  .cellar tr { padding:14px 2px; border-bottom:1px solid var(--line); }
+  .cellar tr:last-child { border-bottom:none; }
+  .cellar td { border:none; padding:3px 0; }
+  .cellar td:first-child { white-space:normal; font-size:16px; }
+  .cellar td:nth-child(2), .cellar td:nth-child(4) { display:none; }
+  .cellar td:nth-child(5) { min-width:0; }
+  .cellar form.mini { margin-top:8px; }
+  .cellar form.mini input { flex:1; width:auto; max-width:none;
+        min-height:44px; }
+  .cellar form.mini button { min-height:44px; }
+  .sheet-head { flex-wrap:wrap; gap:4px; }
+  .sheet-head h2 { flex:1 0 100%; }
+}
 @media (max-width:640px) {
   header { padding:10px 16px; gap:14px; }
   main { padding:16px 14px 70px; }
@@ -264,7 +336,8 @@ ol.steps .mut { line-height:1.5; margin-top:3px; }
 }
 """
 
-NAV = [("/", "Design & must"), ("/recipes", "Recipes")]
+NAV = [("/", "Today"), ("/design", "Design & must"),
+       ("/recipes", "Recipes")]
 
 
 class raw(str):
@@ -278,7 +351,8 @@ def esc(value):
     return _escape(str(value), quote=True)
 
 
-def page(title, body, active="/", msg=None, kind="ok", tail="", lede=None):
+def page(title, body, active="/", msg=None, kind="ok", tail="", lede=None,
+         wide=False):
     nav = "".join(
         f'<a href="{href}"{" class=active" if href == active else ""}>'
         f"{esc(label)}</a>" for href, label in NAV)
@@ -291,7 +365,8 @@ def page(title, body, active="/", msg=None, kind="ok", tail="", lede=None):
             f'<body><header><span class="brand">{BRAND_MARK}'
             f"Warblers Meadery</span>"
             f"<nav>{nav}</nav></header>"
-            f"<main><h1>{esc(title)}</h1>{intro}{top}{body}</main>"
+            f'<main{" class=wide" if wide else ""}>'
+            f"<h1>{esc(title)}</h1>{intro}{top}{body}</main>"
             f"{tail}</body></html>")
 
 
@@ -328,7 +403,8 @@ def table(head, rows, empty="Nothing here yet."):
     h = "".join(f"<th>{esc(c)}</th>" for c in head)
     body = "".join("<tr>" + "".join(f"<td>{esc(c)}</td>" for c in r) + "</tr>"
                    for r in rows)
-    return f'<div class="tw"><table><tr>{h}</tr>{body}</table></div>'
+    return (f'<div class="tw"><table><thead><tr>{h}</tr></thead>'
+            f"<tbody>{body}</tbody></table></div>")
 
 
 def details(summary, body, open_=False):
@@ -416,7 +492,8 @@ def num(x, dp=2):
 
 
 def sg(x):
-    return f"{x:.3f}"
+    from .calc import sg_text
+    return sg_text(x)
 
 
 def lb_oz(lb):

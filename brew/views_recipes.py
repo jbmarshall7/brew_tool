@@ -80,7 +80,7 @@ def keep_design(form):
                  "notes": form.get("notes", "")})
     if form.get("from_slug"):
         keep["recipe"] = form["from_slug"]
-    return "/?" + urlencode(keep)
+    return "/design?" + urlencode(keep)
 
 
 # --- POST /recipes: save --------------------------------------------------
@@ -132,7 +132,7 @@ def recipes(req):
     body = table(["Recipe", "Must"], rows,
                  empty="No recipes yet. Design one — it's two numbers.")
     if not rows:
-        body += next_link("/", "Design a recipe")
+        body += next_link("/design", "Design a recipe")
     problems = req.store.unreadable()
     if problems:
         body = banner("Some files couldn't be read and are left out:\n"
@@ -184,7 +184,7 @@ def recipe(req):
     else:
         batch_block = ""
     body = (card(identity)
-            + next_link(f"/?recipe={r['slug']}", "Redesign")
+            + next_link(f"/design?recipe={r['slug']}", "Redesign")
             + scale_form
             + render_sheet(p, f"At {num(p['gal'])} gal you'll need")
             + notes + batch_block

@@ -47,8 +47,8 @@ class MustTest(unittest.TestCase):
                       "cal_f": "60", "ph": "3.9"})
         body = r.body
         self.assertIn('class="msg warn"', body)
-        for expected in ("OG 1.103 (read 1.101 at 76 °F, hydrometer 60 °F)",
-                         "3.8 points under 1.107", "0.87 lb (14 oz) honey",
+        for expected in ("OG 1.1029 (read 1.101 at 76 °F, hydrometer 60 °F)",
+                         "3.8 points under 1.1067", "0.87 lb (14 oz) honey",
                          "about 0.07 gal", "13.5 %", "pH 3.9", "happy must"):
             self.assertIn(expected, body, expected)
         self.assertIn("<button>Check again</button>", body)
@@ -57,7 +57,7 @@ class MustTest(unittest.TestCase):
     def test_reads_high(self):
         r = self.get({"gal": "6", "reading": "1.112", "temp_f": "60"})
         body = r.body
-        for expected in ("5.3 points over 1.107", "0.3 gal (1.1 L) water",
+        for expected in ("5.3 points over 1.1067", "0.3 gal (1.1 L) water",
                          "at 6.3 gal", "14.7 %", "past what 71B is rated for"):
             self.assertIn(expected, body, expected)
 
@@ -90,9 +90,9 @@ class MustTest(unittest.TestCase):
     def test_calibration_changes_the_verdict(self):
         r = self.get({"gal": "6", "reading": "1.101", "temp_f": "76",
                       "cal_f": "68"})
-        self.assertIn("OG 1.102 (read 1.101 at 76 °F, hydrometer 68 °F)",
+        self.assertIn("OG 1.1021 (read 1.101 at 76 °F, hydrometer 68 °F)",
                       r.body)
-        self.assertIn("4.6 points under 1.107", r.body)
+        self.assertIn("4.6 points under 1.1067", r.body)
 
     def test_ph_bands(self):
         self.assertIn("low, and it drops further",

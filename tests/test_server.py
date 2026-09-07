@@ -1,7 +1,9 @@
 """The router: pure dispatch, error banners instead of tracebacks, and one
 real HTTP round trip."""
 import http.client
+import shutil
 import sys
+import tempfile
 import threading
 import unittest
 from pathlib import Path
@@ -10,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from brew import server
 from brew.server import Request, dispatch, make_server, route
+from brew.store import Store
 
 
 def get(path, params=None, store=None):
@@ -21,8 +24,13 @@ def post(path, form=None, store=None):
 
 
 class DispatchTest(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="brew-test-"))
+        self.addCleanup(shutil.rmtree, self.root)
+        self.store = Store(self.root)
+
     def test_home_renders(self):
-        r = get("/")
+        r = dispatch(Request("GET", "/", {}, {}, (), self.store))
         self.assertEqual(r.status, 200)
         self.assertIn("brew_tool", r.body)
         self.assertIn('<meta name="viewport"', r.body)
@@ -59,7 +67,8 @@ class DispatchTest(unittest.TestCase):
             "/recipes/x/must?gal=6&msg=No&kind=err#record")
 
     def test_banner_from_query(self):
-        r = get("/", {"msg": "Hello <cellar>", "kind": "warn"})
+        r = dispatch(Request("GET", "/", {"msg": "Hello <cellar>",
+                                          "kind": "warn"}, {}, (), self.store))
         self.assertIn('class="msg warn"', r.body)
         self.assertIn("Hello &lt;cellar&gt;", r.body)
 
@@ -84,19 +93,19 @@ class HttpTest(unittest.TestCase):
         return resp, text
 
     def test_get_home(self):
-        resp, text = self.request("GET", "/")
+        resp, text = self.request("GET", "/design")
         self.assertEqual(resp.status, 200)
         self.assertIn("brew_tool", text)
         self.assertTrue(resp.getheader("Content-Type").startswith("text/html"))
 
     def test_blank_query_values_reach_the_view(self):
-        resp, text = self.request("GET", "/?gal=6&abv=&og=1.1067")
+        resp, text = self.request("GET", "/design?gal=6&abv=&og=1.1067")
         self.assertIn('name="abv" type="number" value=""', text)
         self.assertIn("Strength is set by the OG below", text)
 
     def test_cross_site_post_refused(self):
         resp, _ = self.request(
-            "POST", "/", body="a=1",
+            "POST", "/design", body="a=1",
             headers={"Origin": "http://evil.example",
                      "Content-Type": "application/x-www-form-urlencoded"})
         self.assertEqual(resp.status, 403)

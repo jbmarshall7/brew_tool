@@ -9,6 +9,7 @@ import os
 import re
 import sys
 import tempfile
+from datetime import datetime
 from pathlib import Path
 
 
@@ -134,6 +135,55 @@ class Store:
     def save_batch(self, batch):
         self.write_json(self.batch_path(batch["id"]), batch)
         return batch
+
+    def add_reading(self, batch_id, reading, sample_f=None, cal_f=None,
+                    note="", at=None):
+        """Append one gravity to a batch. The corrected value is stored
+        alongside what the glass actually said, the way must day does it —
+        everything else the ledger shows is derived on render."""
+        from . import calc
+        batch = self.load_batch(batch_id)
+        reading = calc.num(reading, "hydrometer reading", 0.950, 1.250)
+        cal = (calc.DEFAULT_CAL_F if calc.blank(cal_f)
+               else calc.num(cal_f, "hydrometer calibration", 32, 110, " °F"))
+        if calc.blank(sample_f):
+            sample_f, corrected = None, reading
+        else:
+            sample_f = calc.num(sample_f, "sample temperature", 32, 140, " °F")
+            corrected = calc.hydro_correct(reading, sample_f, cal)
+        when = calc.parse_when(at) if at else datetime.now()
+        batch.setdefault("readings", []).append({
+            "at": calc.fmt_when(when), "reading": reading,
+            "sample_f": sample_f, "cal_f": cal, "sg": corrected,
+            "note": (note or "").strip(),
+        })
+        batch["readings"].sort(key=lambda r: r.get("at") or "")
+        self.save_batch(batch)
+        return batch, corrected
+
+    def record_feed(self, batch_id, n, at=None, note=""):
+        """Record that a scheduled feeding was actually given.
+
+        An event, not a status: append-only, like a reading, because whether
+        the nutrient went in is the one thing about the schedule the app
+        cannot derive. Nothing is ever un-ticked — a mistake is a note.
+        """
+        from . import calc
+        batch = self.load_batch(batch_id)
+        n = int(calc.num(n, "feeding number", 1, 99))
+        planned = [a for a in (batch.get("nutrients") or {}).get("additions")
+                   or [] if a.get("n") == n]
+        if not planned:
+            raise ValueError(f"{batch_id} has no feeding #{n}")
+        if any(f.get("n") == n for f in batch.get("feeds") or []):
+            raise ValueError(f"Feeding #{n} is already logged on {batch_id}")
+        when = calc.parse_when(at) if at else datetime.now()
+        batch.setdefault("feeds", []).append({
+            "n": n, "at": calc.fmt_when(when), "g": planned[0].get("g"),
+            "note": (note or "").strip()})
+        batch["feeds"].sort(key=lambda f: f.get("n") or 0)
+        self.save_batch(batch)
+        return batch, planned[0]
 
     def list_batches(self):
         out = self._read_all(self.batches_dir.glob("*.json"))

@@ -37,6 +37,7 @@ TOSNA_ADDITIONS = 4
 TOSNA_HOURS = (24, 48, 72)       # additions 1-3, hours after pitch
 TOSNA_LAST_DAY = 7               # the last addition's cap, days after pitch
 ON_TARGET_PTS = 2.0              # within this of target = hydrometer resolution
+DEFAULT_CAL_F = 60               # most hydrometers; the form can override
 PH_FLOOR = 3.2
 PH_LOW_WATCH = 3.5               # below this it will likely crash in primary
 PH_NORMAL = (3.7, 4.2)
@@ -82,6 +83,16 @@ def blank(value):
 # --- gravity and alcohol ----------------------------------------------------
 def points(sg):
     return (sg - 1.0) * 1000.0
+
+
+def sg_text(value):
+    """A gravity as the cellar writes it: three decimals, and a fourth when
+    it carries information (1.030, but 1.1029 — the point the correction
+    turns on is in that last digit)."""
+    if value is None:
+        return "—"
+    four = f"{value:.4f}"
+    return four[:-1] if four.endswith("0") else four
 
 
 def abv(og, fg):
@@ -421,3 +432,198 @@ def next_batch_id(existing_ids, year):
         if i.startswith(prefix) and i[len(prefix):].isdigit():
             nums.append(int(i[len(prefix):]))
     return f"{prefix}{max(nums, default=0) + 1:03d}"
+
+
+# --- the fermentation log ---------------------------------------------------
+# One gravity in, three columns out. Nothing below is ever stored: drop, ABV
+# so far, attenuation and the next-action sentence are computed from the
+# readings and the pitch date on every render, so there is no status for the
+# operator to keep up to date.
+STUCK_PTS = 1.0             # movement at or under this is not movement
+RISE_PTS = 0.5              # a rise past this is the glass, not the mead
+STALE_DAYS = 7              # after this, one gravity settles it
+FINISHED_MARGIN = 0.004     # this close to FG and the sugar is gone
+
+
+def day_of(pitched_at, at):
+    """The batch's day number at `at` — whole days since the pitch."""
+    start = pitched_at if isinstance(pitched_at, datetime) else parse_when(pitched_at)
+    when = at if isinstance(at, datetime) else parse_when(at)
+    return (when.date() - start.date()).days
+
+
+def attenuation(og, sg_now):
+    """Apparent attenuation: the share of the original sugar now gone."""
+    span = og - 1.0
+    if span <= 0:
+        return 0
+    return round((og - sg_now) / span * 100)
+
+
+def ledger(og, pitched_at, readings):
+    """One row per reading, everything but the gravity itself derived."""
+    rows, prev = [], None
+    for r in sorted(readings or [], key=lambda x: x.get("at") or ""):
+        sg_now = r.get("sg")
+        if sg_now is None or not r.get("at"):
+            continue
+        rows.append({
+            "at": r["at"], "day": day_of(pitched_at, r["at"]),
+            "sg": sg_now, "reading": r.get("reading"),
+            "sample_f": r.get("sample_f"), "note": r.get("note") or "",
+            "drop": None if prev is None else round((prev - sg_now) * 1000, 1),
+            "abv": abv(og, sg_now) if og else None,
+            "atten": attenuation(og, sg_now) if og else None,
+        })
+        prev = sg_now
+    return rows
+
+
+def current_sg(batch):
+    """The gravity as it stands: the last reading, else the must's OG."""
+    rows = sorted(batch.get("readings") or [], key=lambda x: x.get("at") or "")
+    for r in reversed(rows):
+        if r.get("sg") is not None:
+            return r["sg"]
+    return (batch.get("measured") or {}).get("og")
+
+
+def feeds_given(batch):
+    """The numbers of the feedings actually recorded as given."""
+    return {f.get("n") for f in batch.get("feeds") or [] if f.get("n")}
+
+
+def next_feed(batch, now):
+    """(the next feeding still owed, is the window shut).
+
+    A feeding already recorded as given drops out. The window shuts for good
+    once the gravity is past the 1/3 break — nothing is fed after that,
+    whatever the calendar says, because late nitrogen feeds spoilage rather
+    than yeast.
+    """
+    nut = batch.get("nutrients") or {}
+    stop, now_sg = nut.get("stop_sg"), current_sg(batch)
+    if stop is not None and now_sg is not None and now_sg <= stop:
+        return None, True
+    given = feeds_given(batch)
+    for a in nut.get("additions") or []:
+        if a.get("n") in given:
+            continue
+        try:
+            parse_when(a["due"])
+        except (ValueError, KeyError):
+            continue
+        return a, False
+    return None, False
+
+
+def _clock(dt):
+    hour = dt.hour % 12 or 12
+    return f"{dt:%a %b} {dt.day}, {hour}:{dt:%M} {'am' if dt.hour < 12 else 'pm'}"
+
+
+def _g1(x):
+    return f"{round(float(x), 1):g}"
+
+
+def next_action(batch, now=None, product="Fermaid O"):
+    """The one sentence saying what to do about this batch, derived fresh.
+
+    The order is deliberate. A feeding with a clock on it outranks anything
+    the gravity is doing. A finished gravity comes next, because that is a
+    level and one reading settles it. Everything after needs two readings to
+    compare — nothing here ever claims movement it cannot see.
+    """
+    now = now or datetime.now()
+    og = (batch.get("measured") or {}).get("og")
+    fg = (batch.get("target") or {}).get("fg") or 1.0
+    pitched = batch.get("pitched_at")
+    rows = ledger(og, pitched, batch.get("readings"))
+    feed, past_break = next_feed(batch, now)
+    last = rows[-1] if rows else None
+    now_sg = last["sg"] if last else og
+    stop = (batch.get("nutrients") or {}).get("stop_sg")
+
+    def warn(tag, text):
+        return {"kind": "warn", "tag": tag, "text": text}
+
+    def ok(tag, text):
+        return {"kind": "ok", "tag": tag, "text": text}
+
+    # 1 — a feeding owed today or already late beats anything the gravity
+    # is doing; one still in the future is only worth a mention (rule 5)
+    if feed is not None:
+        due = parse_when(feed["due"])
+        late = (now.date() - due.date()).days
+        if late >= 0:
+            whenever = ("due today at " + _clock(due).split(", ")[1]
+                        if late == 0 else
+                        f"was due {_clock(due)}, {late} day"
+                        f"{'s' if late != 1 else ''} ago")
+            return warn(
+                "Feed due",
+                f"{product} #{feed['n']}, {_g1(feed['g'])} g — {whenever}. "
+                f"Stop at SG {sg_text(feed.get('stop_sg') or stop)} whatever "
+                "the calendar says.")
+
+    # 2 — at or below the target: a level, so one reading settles it
+    if now_sg is not None and rows and now_sg <= fg + FINISHED_MARGIN:
+        return ok("Ready to rack", f"{sg_text(now_sg)} and steady at "
+                  f"{_g1(abv(og, now_sg))} % — taste it, then rack it off "
+                  "the lees.")
+
+    # 3 — it reads higher than last time: suspect the glass, not the mead
+    if last is not None and last["drop"] is not None \
+            and last["drop"] < -RISE_PTS:
+        return warn(
+            "Reads high",
+            f"{sg_text(last['sg'])} — it reads {_g1(-last['drop'])} points "
+            "higher than last time. Stir it and re-read, or check the sample "
+            "temperature: a rising gravity is usually the glass, not the mead.")
+
+    # 4 — stuck: a day or more with nothing to show for it
+    if len(rows) >= 2:
+        gap = day_of(rows[-2]["at"], last["at"])
+        if gap >= 1 and abs(last["drop"] or 0) <= STUCK_PTS:
+            fix = ("Nitrogen is done, so warm it and rouse it, then read "
+                   "again in 24 h." if past_break or feed is None else
+                   "Check the temperature first, then rouse it.")
+            return warn("Stalled", f"Stuck at {sg_text(last['sg'])} — no movement in "
+                        f"{gap} day{'s' if gap != 1 else ''}. {fix}")
+
+    # 5 — nothing to compare yet: no readings, or the only one is today's
+    read_today = last is not None and day_of(last["at"], now) == 0
+    if not rows or (len(rows) == 1 and read_today):
+        if day_of(pitched, now) == 0:
+            opened = f"Pitched today at {sg_text(now_sg)}."
+        elif rows:
+            opened = (f"{sg_text(now_sg)} today, on day "
+                      f"{day_of(pitched, now)} — nothing to compare it with "
+                      "yet.")
+        else:
+            opened = (f"Pitched at {sg_text(now_sg)}, "
+                      f"{day_of(pitched, now)} days ago, and not read since.")
+        if feed is not None:
+            return ok("Waiting", f"{opened} Next up: {product} #{feed['n']}, "
+                      f"{_g1(feed['g'])} g {_clock(parse_when(feed['due']))}.")
+        return ok("Waiting", f"{opened} A gravity in a day or two tells you where it is.")
+
+    # 6 — nobody has looked in a week
+    stale = day_of(last["at"], now)
+    if stale >= STALE_DAYS:
+        return warn("Reading is old", f"Last read {stale} days ago at {sg_text(last['sg'])}. "
+                    "One gravity says whether it is finished or stuck.")
+
+    # 7 — it is simply working
+    moved = last["drop"]
+    if read_today:
+        if moved and moved > STUCK_PTS:
+            return ok("Still moving", f"{sg_text(last['sg'])}, {_g1(moved)} points down — "
+                      "still moving. Next reading in a couple of days.")
+        return ok("Quiet", f"{sg_text(last['sg'])} — give it a day before the next "
+                  "reading.")
+    span = day_of(rows[-2]["at"], last["at"]) if len(rows) >= 2 else 0
+    tail = (f" — {_g1(moved)} points down in {span} day"
+            f"{'s' if span != 1 else ''}" if moved and span else "")
+    return ok("Quiet", f"Last read {stale} day{'s' if stale != 1 else ''} ago at "
+              f"{sg_text(last['sg'])}{tail}. Worth another this week.")

@@ -141,20 +141,21 @@ def render(params, store=None, msg=None, kind="ok"):
         right += next_link(must_href(editing, p) if editing else "/recipes",
                            f"Make must at {num(p['gal'])} gal"
                            if editing else "Every recipe you've kept")
-    body = (f'<form method="get" action="/" id="targets">{keep}'
+    body = (f'<form method="get" action="/design" id="targets">{keep}'
             f'<div class="cols"><div class="stack">{left}</div>'
             f'<div class="stack">{right}</div></div></form>')
     if err:
         msg, kind = err, "err"
     title = f"Redesign {editing['name']}" if editing else "Design a recipe"
-    return _page(title, body, "/", msg, kind, tail=SCRIPT, lede=LEDE)
+    return _page(title, body, "/design", msg, kind, tail=SCRIPT,
+                 lede=LEDE)
 
 
 def must_href(recipe, p):
     return f"/recipes/{recipe['slug']}/must?gal={num(p['gal'])}"
 
 
-@route("GET", "/")
+@route("GET", "/design")
 def design(req):
     return Response(render(req.params, req.store, req.params.get("msg"),
                            req.params.get("kind", "ok")))

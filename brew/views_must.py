@@ -18,7 +18,7 @@ from .server import Response, redirect, route
 from .sheet import feed_when, product_name
 from .views_recipes import plan_for
 
-DEFAULT_CAL_F = 60
+DEFAULT_CAL_F = calc.DEFAULT_CAL_F
 RECORD_FIELDS = ("id", "pitched_at", "volume_gal", "honey_lb", "water_gal",
                  "yeast_g", "goferm_g", "og", "ph", "notes")
 CHECK_FIELDS = ("gal", "now_gal", "reading", "temp_f", "cal_f", "ph")

@@ -88,12 +88,12 @@ class SaveTest(RecipeTestCase):
                                        notes="try D47 next time"))
         self.assertEqual(r.status, 303)
         u = urlparse(r.location)
-        self.assertEqual(u.path, "/")
+        self.assertEqual(u.path, "/design")
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         self.assertIn("Give the recipe a name", q["msg"])
         self.assertEqual(q["abv"], "13.5")
         self.assertEqual(q["notes"], "try D47 next time")
-        body = self.get("/", q).body
+        body = self.get("/design", q).body
         self.assertIn('class="msg err"', body)
         self.assertIn('name="abv" type="number" value="13.5"', body)
         self.assertIn("try D47 next time", body)
@@ -103,7 +103,7 @@ class SaveTest(RecipeTestCase):
         self.post("/recipes", OWNER)
         r = self.post("/recipes", dict(OWNER, abv="13"))
         self.assertEqual(r.status, 303)
-        self.assertTrue(r.location.startswith("/?"))
+        self.assertTrue(r.location.startswith("/design?"))
         self.assertIn("abv=13", r.location)
         self.assertIn("name=Orange+Blossom+Traditional", r.location)
         self.assertIn("already%20a%20recipe%20called", r.location)
@@ -128,18 +128,21 @@ class PagesTest(RecipeTestCase):
     def test_empty_list_points_at_design(self):
         r = self.get("/recipes")
         self.assertIn("No recipes yet", r.body)
-        self.assertIn('href="/"', r.body)
+        # the link in the body, not the one in the nav
+        self.assertIn("Design a recipe →", r.body)
+        self.assertIn('class="next"><a href="/design"', r.body)
 
     def test_list_and_page(self):
         self.post("/recipes", OWNER)
         r = self.get("/recipes")
         self.assertIn("Orange Blossom Traditional", r.body)
-        self.assertIn("14 % · OG 1.107", r.body)
+        self.assertIn("14 % · OG 1.1067", r.body)
         r = self.get("/recipes/orange-blossom-traditional")
         self.assertEqual(r.status, 200)
         self.assertIn("18.29 lb", r.body)
         self.assertIn("10 g 71B", r.body)
-        self.assertIn('href="/?recipe=orange-blossom-traditional"', r.body)
+        self.assertIn('href="/design?recipe=orange-blossom-traditional"',
+                      r.body)
 
     def test_scaled_to_five_gallons(self):
         self.post("/recipes", OWNER)
@@ -155,7 +158,7 @@ class PagesTest(RecipeTestCase):
 
     def test_redesign_prefills_the_design_page(self):
         self.post("/recipes", OWNER)
-        r = self.get("/", {"recipe": "orange-blossom-traditional"})
+        r = self.get("/design", {"recipe": "orange-blossom-traditional"})
         self.assertIn("Redesign Orange Blossom Traditional", r.body)
         self.assertIn('name="abv" type="number" value="14"', r.body)
         # the strain is a pill radio now, and this recipe's is the one lit
@@ -167,7 +170,7 @@ class PagesTest(RecipeTestCase):
         self.assertIn('value="orange blossom"', r.body)
 
     def test_design_page_is_one_form_so_a_recompute_keeps_the_name(self):
-        r = self.get("/", {"gal": "6", "abv": "14",
+        r = self.get("/design", {"gal": "6", "abv": "14",
                            "name": "Orange Blossom Traditional",
                            "honey": "orange blossom", "notes": "keep"})
         body = r.body
@@ -183,7 +186,7 @@ class PagesTest(RecipeTestCase):
         self.assertLess(body.index('class="card save"'), body.index("</form>"))
 
     def test_strain_and_demand_are_pickers(self):
-        body = self.get("/", {"gal": "6", "abv": "14", "yeast": "D47",
+        body = self.get("/design", {"gal": "6", "abv": "14", "yeast": "D47",
                               "demand": "high"}).body
         # every strain the tolerance table knows is offered, D47 lit
         for y in ("71B", "D47", "QA23", "EC-1118", "K1V-1116"):
@@ -198,12 +201,12 @@ class PagesTest(RecipeTestCase):
     def test_a_strain_off_the_list_still_round_trips(self):
         self.post("/recipes", dict(OWNER, name="House Strain",
                                    yeast="Wyeast 4184"))
-        body = self.get("/", {"recipe": "house-strain"}).body
+        body = self.get("/design", {"recipe": "house-strain"}).body
         self.assertIn('value="Wyeast 4184" checked>Wyeast 4184</label>', body)
         self.assertIn("10 g Wyeast 4184", body)
 
     def test_cleared_abv_means_set_by_og(self):
-        r = self.get("/", {"gal": "6", "abv": "", "og": "1.1067"})
+        r = self.get("/design", {"gal": "6", "abv": "", "og": "1.1067"})
         self.assertIn('name="abv" type="number" value=""', r.body)
         self.assertIn("Strength is set by the OG below", r.body)
         self.assertIn("18.29 lb", r.body)
@@ -217,7 +220,7 @@ class PagesTest(RecipeTestCase):
         self.assertIn("Cyser &quot;2&quot; &lt;b&gt;", main)
         self.assertNotIn('"2" <b>', main)
         self.assertNotIn("<i>oak", main)
-        red = self.get("/", {"recipe": "cyser-2-b"}).body
+        red = self.get("/design", {"recipe": "cyser-2-b"}).body
         for expected in ('value="Cyser &quot;2&quot; &lt;b&gt;"',
                          'value="&lt;i&gt;oak&lt;/i&gt;"',
                          "&lt;script&gt;x&lt;/script&gt;"):
@@ -243,7 +246,7 @@ class PagesTest(RecipeTestCase):
         self.post("/recipes", OWNER)
         (self.root / "recipes" / "wildflower.json").write_text(
             '{"name": "Wildflower",}')
-        home = self.get("/").body
+        home = self.get("/design").body
         self.assertIn('id="targets"', home)
         lst = self.get("/recipes").body
         self.assertIn("Orange Blossom Traditional", lst)
@@ -257,9 +260,9 @@ class PagesTest(RecipeTestCase):
             self.assertNotIn(forbidden, SCRIPT, forbidden)
         self.assertIsNone(re.search(r"\d\s*[-+*/]\s*\d", SCRIPT),
                           "no arithmetic in the browser")
-        r = self.get("/")
-        self.assertIn(SCRIPT, r.body)
-        self.assertNotIn("<script", self.get("/recipes").body)
+        self.assertIn(SCRIPT, self.get("/design").body)
+        for path in ("/", "/recipes"):
+            self.assertNotIn("<script", self.get(path).body, path)
 
 
 if __name__ == "__main__":

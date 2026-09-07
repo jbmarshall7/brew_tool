@@ -178,4 +178,5 @@ def static_font(req):
 
 
 # --- views register their routes on import ---------------------------------
-from . import views_design, views_recipes, views_must, views_batches  # noqa: E402,F401
+from . import (views_today, views_design, views_recipes,  # noqa: E402,F401
+               views_must, views_batches)  # noqa: F401
