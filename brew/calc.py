@@ -78,6 +78,10 @@ STABLE_DAYS = 2
 # flavor mistake you cannot walk back. Past this many days in contact, the
 # tool starts saying taste it.
 OAK_WATCH_DAYS = 14
+# The moments a mead is worth tasting on purpose — the checkpoints where a
+# note now changes what you do next, and where the recipe learns for next time.
+TASTING_STAGES = ("fermenting", "post-primary", "pre-stabilization",
+                  "at bottling", "in the bottle")
 # --- carbonation / bottle-conditioning (sparkling) --------------------------
 # Priming: CO2_to_add(g) = (target_vols - residual_vols) * 1.969 g/L/vol * L,
 # then sugar_g = CO2_g / yield. Yields are g CO2 per g of that sugar (McGill

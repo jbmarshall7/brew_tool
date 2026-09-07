@@ -6,6 +6,17 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-06 — tasting notes and recipe versioning (round 6, roadmap A3+A2).**
+  Two memory aids, most valuable before the cellar fills to eight batches nobody
+  can hold in their head. The batch page gains a Tastings section — a note at a
+  checkpoint (fermenting, post-primary, pre-stabilization, at bottling, in the
+  bottle) with an optional 1–5 score; a log, no guardrails. And a redesign is
+  now a new recipe version with a required one-line changelog, appended to a
+  `history[]` rather than silently overwriting: the recipe page shows the
+  version history, and a batch pins the version it was made from, so last year's
+  mead still reads as it was.
+
+
 - **2026-09-06 — sparkling by bottle-conditioning (round 5, from answer 4).**
   The finishing arc forks after racking: a still mead stabilizes then sweetens
   or bottles dry; a sparkling one *primes* instead. A Carbonate step computes

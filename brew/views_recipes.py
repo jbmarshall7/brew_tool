@@ -101,10 +101,28 @@ def save(req):
         # back to the Design page with everything typed still in place
         return redirect(keep_design(req.form), str(e), "err")
     from_slug = (req.form.get("from_slug") or "").strip()
+
+    def snapshot(rec, version, changelog):
+        c = rec["computed"]
+        return {"version": version, "date": rec["updated"],
+                "changelog": changelog,
+                "abv_if_dry": c.get("abv_if_dry"), "og": c.get("og"),
+                "honey_lb": c.get("honey_lb"), "strength": rec["strength"],
+                "fruit": rec.get("fruit")}
+
     if from_slug:
-        # a redesign keeps its slug: the name is a label, the slug is the file
-        store.load_recipe(from_slug)
+        # a redesign keeps its slug and appends a version with a changelog,
+        # so last year's recipe still reads as it was
+        prev = store.load_recipe(from_slug)
+        changelog = (req.form.get("changelog") or "").strip()
+        if not changelog:
+            return redirect(keep_design(req.form),
+                            "A redesign needs one line on what changed — that "
+                            "is the whole point of keeping versions.", "err")
         recipe["slug"] = from_slug
+        recipe["version"] = (prev.get("version") or 1) + 1
+        recipe["history"] = (prev.get("history") or [])[:]
+        recipe["history"].append(snapshot(recipe, recipe["version"], changelog))
         verb = "Updated"
     elif store.recipe_exists(recipe["slug"]):
         return redirect(keep_design(req.form),
@@ -112,6 +130,8 @@ def save(req):
                         "Open it and Redesign, or give this one another name.",
                         "err")
     else:
+        recipe["version"] = 1
+        recipe["history"] = [snapshot(recipe, 1, "initial version")]
         verb = "Saved"
     store.save_recipe(recipe)
     c = recipe["computed"]
@@ -191,12 +211,26 @@ def recipe(req):
             ["Batch", "Pitched", "Volume", "OG"], brows)
     else:
         batch_block = ""
+    hist = r.get("history") or []
+    if len(hist) > 1:
+        hrows = [[f"v{h['version']}", esc(h.get("date") or ""),
+                  f"{num(h.get('abv_if_dry'), 1)} % · OG {sg(h.get('og') or 0)}",
+                  h.get("changelog") or ""]
+                 for h in reversed(hist)]
+        version_block = (f"<h2>Versions (now v{r.get('version', 1)})</h2>"
+                         + table(["", "Date", "Strength", "What changed"],
+                                 hrows)
+                         + '<p class="mut">A batch pins the version it was made '
+                           "from, so last year's mead still reads as it was.</p>")
+    else:
+        version_block = ""
     body = (card(identity)
             + next_link(f"/design?recipe={r['slug']}", "Redesign")
             + scale_form
             + render_sheet(p, f"At {num(p['gal'])} gal you'll need")
-            + notes + batch_block
-            + f'<p class="mut">Updated {esc(r.get("updated") or "—")}. '
+            + notes + batch_block + version_block
+            + f'<p class="mut">Updated {esc(r.get("updated") or "—")}, '
+              f'v{r.get("version", 1)}. '
               f'File: data/recipes/{esc(r["slug"])}.json</p>')
     return Response(_page(r["name"], body, "/recipes", req.params.get("msg"),
                           req.params.get("kind", "ok")))
