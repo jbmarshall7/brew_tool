@@ -37,12 +37,17 @@ def rows(p):
         og_note = f"{sg(p['fg'])} + {num(p['abv'], 1)} ÷ {calc.ABV_FACTOR}"
     pname = product_name(p["product"])
     when = feed_when(p["additions"], sg(p["third_break_sg"]))
-    return [
+    fr = p.get("fruit")
+    rows = [
         ("OG", sg(p["og"]), og_note),
         ("Honey", value(lb_oz(p["honey_lb"]), f"{num(p['honey_lb_per_gal'])} lb/gal"),
-         f"{num(p['target_pts'], 1)} points × {num(p['gal'])} gal ÷ "
-         f"{p['constants']['PPG_PER_LB_HONEY']} pts per lb per gal — a planning "
-         "figure; the hydrometer has the last word"),
+         (f"{num(p['target_pts'], 1)} points, less {num(fr['points'], 1)} from "
+          f"the {fr['item']}, × {num(p['gal'])} gal ÷ "
+          f"{p['constants']['PPG_PER_LB_HONEY']} — the fruit supplies the rest"
+          if fr else
+          f"{num(p['target_pts'], 1)} points × {num(p['gal'])} gal ÷ "
+          f"{p['constants']['PPG_PER_LB_HONEY']} pts per lb per gal — a planning "
+          "figure; the hydrometer has the last word")),
         ("Honey's own room", f"~{num(p['honey_gal'])} gal",
          f"{num(p['honey_lb'])} ÷ {num(calc.HONEY_LB_PER_GAL)} lb per gal"),
         ("Water", value(gal_l(p["water_gal"]),
@@ -73,6 +78,13 @@ def rows(p):
         ("Expect", f"{num(p['abv_if_dry'], 1)} % if it finishes at {sg(p['fg'])}",
          f"(OG − FG) × {calc.ABV_FACTOR}; the estimate drifts high above ~14 %"),
     ]
+    if fr:
+        rows.insert(2, (
+            "Fruit", value(f"{num(fr['lb'])} lb {fr['item']}",
+                           f"~{num(fr['gal'])} gal, {num(fr['sugar_lb'])} lb sugar"),
+            f"{fr['sugar_pct']} % fermentable sugar → {num(fr['points'], 1)} "
+            "points; confirm OG by hydrometer once the fruit gives up its sugar"))
+    return rows
 
 
 def render_sheet(p, title=None):

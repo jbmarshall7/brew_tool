@@ -13,7 +13,7 @@ from .views_design import DEFAULTS, inputs_from, plan_from
 # the plan keys that are inputs, not results — everything else is `computed`
 INPUT_KEYS = {"strength_by", "gal", "fg", "strain", "demand", "product",
               "additions", "high_og_pitch", "feed_rows", "target_pts",
-              "yeast_rate", "yeast_by_rule"}
+              "yeast_rate", "yeast_by_rule", "fruit"}
 
 
 def computed_from(p):
@@ -39,6 +39,9 @@ def recipe_from_form(f):
                      "fg": p["fg"]},
         "design_gal": p["gal"], "demand": p["demand"], "product": p["product"],
         "additions": p["additions"],
+        "fruit": ({"item": p["fruit"]["item"], "lb": p["fruit"]["lb"],
+                   "sugar_pct": p["fruit"]["sugar_pct"]}
+                  if p.get("fruit") else None),
         "notes": (f.get("notes") or "").strip(),
         "updated": date.today().isoformat(),
         "computed": computed_from(p),
@@ -54,7 +57,12 @@ def inputs_from_recipe(r):
             "fg": f"{s.get('fg', 1.0):.3f}",
             "yeast": r.get("yeast") or DEFAULTS["yeast"],
             "demand": r.get("demand") or "medium",
-            "additions": str(r.get("additions") or 4)}
+            "additions": str(r.get("additions") or 4),
+            "fruit": (r.get("fruit") or {}).get("item", ""),
+            "fruit_lb": (str((r.get("fruit") or {}).get("lb", ""))
+                         if r.get("fruit") else ""),
+            "fruit_pct": (str((r.get("fruit") or {}).get("sugar_pct", ""))
+                          if r.get("fruit") else "")}
 
 
 def plan_for(r, gal):

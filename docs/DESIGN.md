@@ -6,6 +6,17 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-06 — fruit, spice and oak (round 4, roadmap A1).** The Design page
+  can now make a melomel: give a fruit and a weight and the fruit's sugar comes
+  off the target first, so the honey drops to match and the water drops for the
+  fruit's own volume (`honey_for_og_with_fruit`, the old repo's hand-checked
+  `fruit_points`/`fruit_sugar_pct` ported). An unlisted fruit needs a
+  percentage — never a silent guess. Melomel recipes round-trip. On the batch,
+  a Fruit/spice/oak section records what went in; oak and spice carry a contact
+  clock with a "Pull it" button, and `next_action` warns once they have steeped
+  past two weeks — over-extraction is the one flavor you cannot pull back.
+
+
 - **2026-09-06 — the back half of the batch (round 3).** The app used to stop
   at "rack it off the lees" and say nothing more. Now a batch carries
   `rackings[]`, `stabilizations[]`, `sweetenings[]` and a terminal `packaging`,

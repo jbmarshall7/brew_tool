@@ -185,6 +185,45 @@ class Store:
         self.save_batch(batch)
         return batch, planned[0]
 
+    FLAVOR_KINDS = ("fruit", "spice", "oak", "other")
+
+    def record_flavor(self, batch_id, kind, item, qty=None, unit="",
+                      at=None, note=""):
+        """Record a flavor addition — fruit, spice or oak going into the mead."""
+        from . import calc
+        batch = self.load_batch(batch_id)
+        kind = (kind or "").strip().lower()
+        if kind not in self.FLAVOR_KINDS:
+            raise ValueError(f"'{kind}' isn't one of "
+                             f"{', '.join(self.FLAVOR_KINDS)}")
+        item = (item or "").strip()
+        if not item:
+            raise ValueError("give the fruit, spice or oak a name")
+        entry = {"at": calc.fmt_when(calc.parse_when(at) if at
+                                     else datetime.now()),
+                 "kind": kind, "item": item, "note": (note or "").strip()}
+        if not calc.blank(qty):
+            entry["qty"] = calc.num(qty, "quantity", 0, 100000)
+            entry["unit"] = (unit or "").strip() or "lb"
+        batch.setdefault("flavors", []).append(entry)
+        batch["flavors"].sort(key=lambda f: f.get("at") or "")
+        self.save_batch(batch)
+        return batch
+
+    def pull_flavor(self, batch_id, index, at=None):
+        """Stamp a flavor addition as pulled — stops its contact clock."""
+        from . import calc
+        batch = self.load_batch(batch_id)
+        flavors = batch.get("flavors") or []
+        if not 0 <= index < len(flavors):
+            raise ValueError(f"no flavor addition #{index + 1}")
+        if flavors[index].get("pulled_at"):
+            raise ValueError("that one is already pulled")
+        flavors[index]["pulled_at"] = calc.fmt_when(
+            calc.parse_when(at) if at else datetime.now())
+        self.save_batch(batch)
+        return batch
+
     def record_racking(self, batch_id, volume_gal, at=None, note=""):
         """Record racking off the lees: the measured volume now in the vessel.
 
