@@ -8,7 +8,8 @@ to keep up to date.
 from datetime import datetime
 
 from . import calc
-from .html import (banner, card, esc, field, hidden, kv, next_link, num,
+from .html import (banner, card, details, esc, field, hidden, kv,
+                   next_link, num,
                    page as _page, pill, raw, sg, table, textarea)
 from .server import Response, redirect, route
 from .chart import curve
@@ -128,6 +129,185 @@ def log_form(batch_id, params=None):
             "comes from the must record.</p></div></form>")
 
 
+def _fin_step(title, done_summary, action):
+    """One finishing step: a done summary, or the action that does it."""
+    body = done_summary if done_summary else action
+    return f'<div class="finstep"><h3>{esc(title)}</h3>{body}</div>'
+
+
+def finishing_card(b, params):
+    """Rack, stabilize, sweeten, bottle — the back half of the batch.
+
+    Each step shows what was recorded, or the way to record it. Stabilizing
+    and sweetening meter real things, so they preview the dose (a GET that
+    writes nothing) before the record button appears — the same shape as the
+    must-day check.
+    """
+    bid = b["id"]
+    og = (b.get("measured") or {}).get("og")
+    fg = (b.get("target") or {}).get("fg") or 1.0
+    now_sg = calc.current_sg(b)
+    vol = calc.current_volume(b)
+    steps = []
+
+    # 1 — rack
+    if calc.is_racked(b):
+        last = b["rackings"][-1]
+        note = f" · {last['note']}" if last.get("note") else ""
+        summary = kv([("Racked", f"{num(last['volume_gal'])} gal in the vessel",
+                       f"{when(last['at'])}{note}")])
+        again = details("Racked again", f"""<div class="inner">
+<form class="inline" method="post" action="/batches/{esc(bid)}/rack">
+{field("volume_gal", "Volume now (gal)", num(vol), "Measured after racking.")}
+{field("note", "Note", "", None, typ="text")}<button class="quiet">Record another racking</button></form></div>""")
+        steps.append(_fin_step("Rack off the lees", summary + again, ""))
+    else:
+        form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/rack">
+<p class="mut">Rack once it falls clear. Record the volume actually in the
+vessel — every dose below is per that gallon.</p>
+{field("volume_gal", "Volume now (gal)", num(vol), "A little less than the batch — racking leaves the lees behind.")}
+{field("note", "Note", "", None, typ="text")}<button>Record racking</button></form>"""
+        steps.append(_fin_step("Rack off the lees", "", form))
+
+    # 2 — stabilize (preview then record)
+    if calc.is_stabilized(b):
+        st = b["stabilizations"][-1]
+        summary = kv([("Stabilized",
+                       f"{num(st['kmeta_g'], 3)} g K-meta + "
+                       f"{num(st['sorbate_g'])} g sorbate",
+                       f"{when(st['at'])} · pH {num(st['ph'], 2)} · "
+                       f"{num(st['volume_gal'])} gal"
+                       + (f" · override: {st['override']}"
+                          if st.get("override") else ""))])
+        steps.append(_fin_step("Stabilize", summary, ""))
+    else:
+        stab = _stabilize_action(b, params, vol, og, now_sg)
+        steps.append(_fin_step("Stabilize", "", stab))
+
+    # 3 — back-sweeten (preview then record)
+    if calc.is_sweetened(b):
+        sw = b["sweetenings"][-1]
+        summary = kv([("Back-sweetened",
+                       f"{sg(sw['from_sg'])} → {sg(sw['to_sg'])}",
+                       f"{when(sw['at'])} · {num(sw['honey_lb'])} lb honey"
+                       + (f" · override: {sw['override']}"
+                          if sw.get("override") else ""))])
+        steps.append(_fin_step("Back-sweeten (optional)", summary, ""))
+    else:
+        sweet = _sweeten_action(b, params, vol, now_sg)
+        steps.append(_fin_step("Back-sweeten (optional)", "", sweet))
+
+    # 4 — bottle
+    if calc.is_bottled(b):
+        pk = b["packaging"]
+        summary = kv([("Bottled", f"{pk['units']} × {pk['unit']}",
+                       f"{when(pk['at'])} · {num(pk.get('volume_gal'))} gal")])
+        steps.append(_fin_step("Bottle", summary, ""))
+    else:
+        form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/bottle">
+<p class="mut">The last step. {num(vol)} gal is about
+{int((vol or 0) / 0.198)} × 750 mL, or {int((vol or 0) / 0.041)} × 12 oz.</p>
+<div class="grid">
+<span>{field("units", "How many", "", "The count you actually filled.", step="1")}</span>
+<span>{field("unit", "Package", "750 mL bottle", "Bottle, keg, whatever it went in.", typ="text")}</span>
+</div>{field("note", "Note", "", None, typ="text")}<button>Record bottling</button></form>"""
+        steps.append(_fin_step("Bottle", "", form))
+
+    in_arc = (calc.is_racked(b) or calc.is_stabilized(b) or calc.is_sweetened(b)
+              or calc.is_bottled(b)
+              or (now_sg is not None and b.get("readings")
+                  and now_sg <= fg + calc.FINISHED_MARGIN))
+    inner = f'<div class="finsteps">{"".join(steps)}</div>'
+    if in_arc:
+        return f'<h2 id="finish">Finishing</h2>{inner}'
+    return details("Finishing — rack, stabilize, sweeten, bottle", inner)
+
+
+def _stabilize_action(b, params, vol, og, now_sg):
+    bid = b["id"]
+    ph = params.get("stab_ph")
+    if not calc.blank(ph):
+        try:
+            phv = calc.num(ph, "pH", 2.0, 4.5)
+            abv_now = calc.abv(og, now_sg) if og else 0.0
+            d = calc.stabilize_doses(vol, phv, abv_now)
+        except ValueError as e:
+            return banner(str(e), "err") + _stabilize_form(b, "")
+        step = (" (stepped up — sorbate is weaker at this pH/ABV)"
+                if d["sorbate_stepped_up"] else "")
+        pre = banner(
+            f"For {num(d['gallons'])} gal at pH {num(phv, 2)}: "
+            f"{num(d['kmeta_g'], 3)} g potassium metabisulfite "
+            f"(~{num(d['free_so2_ppm'], 1)} ppm free SO₂) and "
+            f"{num(d['sorbate_g'])} g potassium sorbate ({d['sorbate_ppm']} "
+            f"ppm){step}. They go in together — sorbate alone smells of "
+            "geraniums. Ignores any SO₂ already there; measure free SO₂ "
+            "for real work.", "ok")
+        override = "" if calc.is_stable(b) else details(
+            "It is not steady yet, but I know what I'm doing",
+            '<div class="inner">' + field(
+                "override", "Reason (recorded with the dose)", "",
+                "e.g. cold-crashed and confirmed flat by taste.", typ="text")
+            + '</div>')
+        rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/stabilize">
+{hidden("ph", num(phv, 2))}
+{field("note", "Note", "", None, typ="text")}{override}<button>Record — both go in</button></form>"""
+        return pre + rec
+    return _stabilize_form(b, "")
+
+
+def _stabilize_form(b, _):
+    bid = b["id"]
+    steady = calc.is_stable(b)
+    lead = ("" if steady else
+            '<p class="mut">It has not held a steady gravity for a couple of '
+            "days yet — stabilizing a mead that is still working does nothing. "
+            "Preview the dose anyway; recording it will ask for a reason.</p>")
+    return f"""{lead}<form class="inline" method="get" action="/batches/{esc(bid)}#finish">
+<p class="mut">Sorbate and sulfite together, dosed from the pH you measure now.
+This previews the amounts — it writes nothing.</p>
+{field("stab_ph", "Measured pH now", "", "The dose depends on it: lower pH needs far less sulfite.", step="0.01")}
+<button class="quiet">Show the dose</button></form>"""
+
+
+def _sweeten_action(b, params, vol, now_sg):
+    bid = b["id"]
+    target = params.get("sweeten_to")
+    stabilized = calc.is_stabilized(b)
+    if not calc.blank(target):
+        try:
+            to = calc.num(target, "target gravity", 0.990, 1.200)
+            honey = calc.backsweeten_honey(vol, now_sg, to)
+        except ValueError as e:
+            return banner(str(e), "err") + _sweeten_form(b, now_sg)
+        warn = ("" if stabilized else banner(
+            "Not stabilized yet — sweetening now can restart the ferment and "
+            "make bottle bombs. Stabilize first, or record a reason below.",
+            "warn"))
+        ov = ("" if stabilized else details(
+            "Sweeten without stabilizing (a keg you will force-carbonate)",
+            '<div class="inner">' + field("override", "Reason (recorded)", "",
+            "Why it is safe to skip stabilizing.", typ="text") + "</div>"))
+        pre = banner(
+            f"To lift {num(vol)} gal from {sg(now_sg)} to {sg(to)}: about "
+            f"{num(honey)} lb honey, stirred in a little at a time and tasted. "
+            "Confirm the gravity with a hydrometer after it is mixed.", "ok")
+        rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/sweeten">
+{hidden("to_sg", sg(to))}{field("note", "Note", "", None, typ="text")}{ov}
+<button>Record back-sweetening</button></form>"""
+        return warn + pre + rec
+    return _sweeten_form(b, now_sg)
+
+
+def _sweeten_form(b, now_sg):
+    bid = b["id"]
+    return f"""<form class="inline" method="get" action="/batches/{esc(bid)}#finish">
+<p class="mut">Optional. Currently {sg(now_sg)}. Pick the gravity you want and
+this previews the honey — it writes nothing. Stabilize first.</p>
+{field("sweeten_to", "Sweeten up to", "", "1.010–1.020 is off-dry to medium; taste as you go.", step="0.001")}
+<button class="quiet">Show the honey</button></form>"""
+
+
 @route("GET", r"/batches/(B-\d{4}-\d{3})")
 def batch(req):
     b = req.store.load_batch(req.args[0])
@@ -201,6 +381,7 @@ def batch(req):
     seen = curve(b) if view == "curve" else ledger_table(b)
     body = (head + log_form(b["id"], req.params)
             + f'<div class="sheet-head"><h2>The log</h2>{toggle}</div>{seen}'
+            + finishing_card(b, req.params)
             + f'<h2>Must day, kept</h2>{card(facts)}'
             + feed + notes
             + next_link(f"/recipes/{esc(r.get('slug') or '')}",
@@ -264,6 +445,72 @@ def log_feed(req):
         f"Logged {pname} #{planned.get('n')} — {num(planned.get('g'), 1)} g. "
         f"{act['text']}",
         "warn" if act["kind"] == "warn" else "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/rack")
+def rack(req):
+    bid = req.args[0]
+    f = req.form
+    try:
+        b = req.store.record_racking(bid, f.get("volume_gal"),
+                                     note=f.get("note", ""))
+    except ValueError as e:
+        return redirect(f"/batches/{bid}#finish", str(e), "err")
+    act = calc.next_action(b, None, product_name(
+        (b.get("nutrients") or {}).get("product")))
+    vol = calc.current_volume(b)
+    return redirect(f"/batches/{bid}",
+                    f"Racked — {num(vol)} gal in the vessel. {act['text']}",
+                    "warn" if act["kind"] == "warn" else "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/stabilize")
+def stabilize(req):
+    bid = req.args[0]
+    f = req.form
+    try:
+        b, d = req.store.record_stabilize(
+            bid, f.get("ph"), note=f.get("note", ""),
+            override_reason=f.get("override", ""))
+    except ValueError as e:
+        return redirect(f"/batches/{bid}#finish", str(e), "err")
+    return redirect(
+        f"/batches/{bid}",
+        f"Stabilized — {num(d['kmeta_g'], 3)} g K-meta and "
+        f"{num(d['sorbate_g'])} g sorbate into {num(d['gallons'])} gal. Safe "
+        "to back-sweeten now, or bottle it dry.", "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/sweeten")
+def sweeten(req):
+    bid = req.args[0]
+    f = req.form
+    try:
+        b, honey = req.store.record_backsweeten(
+            bid, f.get("to_sg"), note=f.get("note", ""),
+            override_reason=f.get("override", ""))
+    except ValueError as e:
+        return redirect(f"/batches/{bid}#finish", str(e), "err")
+    sw = b["sweetenings"][-1]
+    return redirect(
+        f"/batches/{bid}",
+        f"Back-sweetened to {sg(sw['to_sg'])} with {num(honey)} lb honey. "
+        "Confirm with a hydrometer, taste, then bottle.", "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/bottle")
+def bottle(req):
+    bid = req.args[0]
+    f = req.form
+    try:
+        b = req.store.record_bottling(bid, f.get("units"), f.get("unit"),
+                                      note=f.get("note", ""))
+    except ValueError as e:
+        return redirect(f"/batches/{bid}#finish", str(e), "err")
+    pk = b["packaging"]
+    return redirect(f"/batches/{bid}",
+                    f"Bottled {pk['units']} × {pk['unit']}. That is the batch "
+                    "done — nicely done.", "ok")
 
 
 @route("GET", "/batches")

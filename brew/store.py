@@ -185,6 +185,110 @@ class Store:
         self.save_batch(batch)
         return batch, planned[0]
 
+    def record_racking(self, batch_id, volume_gal, at=None, note=""):
+        """Record racking off the lees: the measured volume now in the vessel.
+
+        Every dose from here on is per this gallon, so it is measured, not
+        computed. You cannot rack into more than you had.
+        """
+        from . import calc
+        batch = self.load_batch(batch_id)
+        vol = calc.num(volume_gal, "volume", 0.05, 1000, " gal")
+        have = calc.current_volume(batch)
+        if have and vol > have + 0.05:
+            raise ValueError(
+                f"{calc.sg_text(vol) if False else vol} gal is more than the "
+                f"{have} gal you had — racking loses a little, it does not add")
+        when = calc.parse_when(at) if at else datetime.now()
+        batch.setdefault("rackings", []).append(
+            {"at": calc.fmt_when(when), "volume_gal": round(vol, 2),
+             "note": (note or "").strip()})
+        batch["rackings"].sort(key=lambda r: r.get("at") or "")
+        self.save_batch(batch)
+        return batch
+
+    def record_stabilize(self, batch_id, ph, at=None, note="",
+                         molecular=None, override_reason=None):
+        """Stabilize: sorbate AND sulfite, dosed from pH and the volume now.
+
+        Refused on a mead that is still working (sulfite will not stop it) and
+        on one already stabilized, unless a reason is recorded. Sorbate alone
+        is never an option here — the two go in together.
+        """
+        from . import calc
+        batch = self.load_batch(batch_id)
+        ph = calc.num(ph, "pH", 2.0, 4.5)
+        molecular = (calc.MOLECULAR_SO2_TARGET if calc.blank(molecular)
+                     else calc.num(molecular, "molecular SO2 target", 0.5, 2.0))
+        if calc.is_stabilized(batch) and not (override_reason or "").strip():
+            raise ValueError(f"{batch_id} is already stabilized — a second "
+                             "dose needs a recorded reason")
+        if not calc.is_stable(batch) and not (override_reason or "").strip():
+            raise ValueError(
+                "This mead has not held a steady gravity for "
+                f"{calc.STABLE_DAYS} days yet — sulfite will not stop a working "
+                "ferment. Log a couple of flat readings first, or record a "
+                "reason to override")
+        vol = calc.current_volume(batch)
+        og = (batch.get("measured") or {}).get("og")
+        abv_now = calc.abv(og, calc.current_sg(batch)) if og else 0.0
+        d = calc.stabilize_doses(vol, ph, abv_now, molecular)
+        when = calc.parse_when(at) if at else datetime.now()
+        entry = {"at": calc.fmt_when(when), "ph": ph, "volume_gal": d["gallons"],
+                 "kmeta_g": d["kmeta_g"], "sorbate_g": d["sorbate_g"],
+                 "free_so2_ppm": d["free_so2_ppm"], "molecular": molecular,
+                 "note": (note or "").strip()}
+        if (override_reason or "").strip():
+            entry["override"] = override_reason.strip()
+        batch.setdefault("stabilizations", []).append(entry)
+        batch["stabilizations"].sort(key=lambda x: x.get("at") or "")
+        self.save_batch(batch)
+        return batch, d
+
+    def record_backsweeten(self, batch_id, to_sg, at=None, note="",
+                           override_reason=None):
+        """Back-sweeten to a target gravity: refused unless already stabilized
+        (or a reason is recorded — a keg you will force-carbonate, say). The
+        honey is computed from the gravity you are raising it from."""
+        from . import calc
+        batch = self.load_batch(batch_id)
+        to_sg = calc.num(to_sg, "target gravity", 0.990, 1.200)
+        from_sg = calc.current_sg(batch)
+        if from_sg is None:
+            raise ValueError("no gravity on record to sweeten up from")
+        if not calc.is_stabilized(batch) and not (override_reason or "").strip():
+            raise ValueError(
+                "Stabilize first — sorbate and sulfite together — or this "
+                "sugar can restart the ferment and make bottle bombs. Record "
+                "a reason to override (a keg you will force-carbonate)")
+        honey = calc.backsweeten_honey(calc.current_volume(batch), from_sg,
+                                       to_sg)
+        when = calc.parse_when(at) if at else datetime.now()
+        entry = {"at": calc.fmt_when(when), "from_sg": from_sg, "to_sg": to_sg,
+                 "honey_lb": honey, "note": (note or "").strip()}
+        if (override_reason or "").strip():
+            entry["override"] = override_reason.strip()
+        batch.setdefault("sweetenings", []).append(entry)
+        batch["sweetenings"].sort(key=lambda x: x.get("at") or "")
+        self.save_batch(batch)
+        return batch, honey
+
+    def record_bottling(self, batch_id, units, unit, at=None, note=""):
+        """Bottle it: the terminal event. Units and the package they went in."""
+        from . import calc
+        batch = self.load_batch(batch_id)
+        if calc.is_bottled(batch):
+            raise ValueError(f"{batch_id} is already bottled")
+        units = int(calc.num(units, "bottle count", 1, 100000))
+        unit = (unit or "").strip() or "bottle"
+        when = calc.parse_when(at) if at else datetime.now()
+        batch["packaging"] = {
+            "at": calc.fmt_when(when), "units": units, "unit": unit,
+            "volume_gal": calc.current_volume(batch),
+            "note": (note or "").strip()}
+        self.save_batch(batch)
+        return batch
+
     def list_batches(self):
         out = self._read_all(self.batches_dir.glob("*.json"))
         return sorted(out, key=lambda b: (b.get("pitched_at") or "",

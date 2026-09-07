@@ -6,6 +6,34 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-06 — the back half of the batch (round 3).** The app used to stop
+  at "rack it off the lees" and say nothing more. Now a batch carries
+  `rackings[]`, `stabilizations[]`, `sweetenings[]` and a terminal `packaging`,
+  and the finishing card on the batch page walks the four steps: rack,
+  stabilize, back-sweeten, bottle. `next_action` gained the whole finishing
+  arc, each stage naming the next physical step. Volume comes from the last
+  racking (measured, not computed), because every dose downstream is per that
+  gallon.
+  - **Stabilizing is the centrepiece and it refuses things.** It will not
+    compute a dose for a mead that has not held a steady gravity for a couple
+    of days (sulfite does not stop a working ferment), sorbate never goes in
+    without sulfite, and both are refused-with-a-recorded-reason rather than
+    silently allowed. The sulfite math is the old repo's hand-checked
+    `molecular_so2_free_needed` / `kmeta_grams`; the sorbate rate is 0.5 g/gal
+    stepped to 0.75 above pH 3.5 or below 10 % ABV (MoreWine practice).
+  - **Back-sweetening is gated on stabilizing** — overridable with a reason
+    (a keg you will force-carbonate). Priming/bottle-conditioning math is
+    still out of scope; a sparkling maker uses the override and primes by
+    hand.
+  - Stabilize and back-sweeten **preview the dose** (a GET that writes
+    nothing) before the record button appears — the same shape as the must-day
+    check, because both meter real additions.
+
+  **Still out of scope:** inventory, lots, traceability, packaging materials,
+  finance — everything in §9 that this round did not touch — plus priming math
+  for sparkling.
+
+
 - **2026-09-06 — the rest of round 2: feeds, the curve, and Today.**
   - **A feeding is recorded, because it is the one thing about the schedule
     the app cannot derive.** An append-only `feeds[]` of `{n, at, g, note}`,
