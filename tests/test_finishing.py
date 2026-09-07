@@ -180,6 +180,23 @@ class BottleTest(FinishTestCase):
             self.store.record_bottling("B-2026-003", "5", "keg")
 
 
+class StabilityWindowTest(FinishTestCase):
+    def test_two_days_means_elapsed_time_not_calendar_days(self):
+        # readings ~26 h apart across a date boundary are NOT two days apart
+        self.store.add_reading("B-2026-003", "1.000", at="2026-08-24T23:00")
+        self.store.add_reading("B-2026-003", "1.000", at="2026-08-26T01:00")
+        self.assertFalse(calc.is_stable(self.store.load_batch("B-2026-003")))
+        # a genuine >48 h span reads stable
+        self.store.add_reading("B-2026-003", "1.000", at="2026-08-28T02:00")
+        self.assertTrue(calc.is_stable(self.store.load_batch("B-2026-003")))
+
+    def test_a_two_point_spread_still_reads_stable(self):
+        # float points must not tip a genuine 2.0-point spread over the limit
+        self.store.add_reading("B-2026-003", "1.002", at="2026-08-24T09:00")
+        self.store.add_reading("B-2026-003", "1.000", at="2026-08-27T09:00")
+        self.assertTrue(calc.is_stable(self.store.load_batch("B-2026-003")))
+
+
 class FinishingArcTest(FinishTestCase):
     def act(self, at=datetime(2026, 9, 6, 10, 0)):
         b = self.store.load_batch("B-2026-003")

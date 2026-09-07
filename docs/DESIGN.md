@@ -6,6 +6,21 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-06 — priming-safety fix (adversarial review of rounds 4–6).** A
+  background chemistry-review workflow caught a high-severity hole I shipped in
+  round 5: `record_priming` refused a *stabilized* mead but never checked the
+  mead was *finished*, so a still-fermenting one could be primed — the yeast
+  would eat the priming sugar on top of the leftover sugar and burst the
+  bottles. Priming now mirrors the stabilize guard (refused unless the gravity
+  has held steady, overridable only with a recorded reason), and the Carbonate
+  step and its preview warn loudly on a working ferment. Two smaller review
+  findings fixed alongside: a primed batch was omitted from the finishing-arc
+  gate and could read "Stuck"; and `is_stable` counted calendar days, so two
+  readings ~26 h apart across midnight could pass the intended 48-hour window —
+  it now measures elapsed time. All four confirmed by two independent refuters;
+  the numbers themselves were verified correct.
+
+
 - **2026-09-06 — dispositions (round 8, roadmap B2).** A bottled batch now
   records where its bottles went — taproom, sold, gift, sample, breakage,
   other — and on-hand is derived (bottled − out), never stored. The batch page

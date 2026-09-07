@@ -741,9 +741,14 @@ def is_stable(batch):
     if len(rows) < 2:
         return False
     last = rows[-1]
+    last_at = parse_when(last["at"])
     for prior in reversed(rows[:-1]):
-        if day_of(prior["at"], last["at"]) >= STABLE_DAYS:
-            return abs(points(last["sg"]) - points(prior["sg"])) <= STABLE_PTS
+        # elapsed hours, not calendar days — two readings either side of
+        # midnight are not "two days apart"
+        if (last_at - parse_when(prior["at"])).total_seconds() \
+                >= STABLE_DAYS * 86400:
+            return (abs(points(last["sg"]) - points(prior["sg"]))
+                    <= STABLE_PTS + 1e-9)
     return False
 
 
@@ -949,7 +954,7 @@ def next_action(batch, now=None, product="Fermaid O"):
     # gravity commentary. Checked most-complete-first.
     finished = now_sg is not None and rows and now_sg <= fg + FINISHED_MARGIN
     if finished or is_racked(batch) or is_stabilized(batch) \
-            or is_sweetened(batch):
+            or is_sweetened(batch) or is_primed(batch):
         if is_sweetened(batch):
             sw = batch["sweetenings"][-1]
             return ok("Ready to bottle",

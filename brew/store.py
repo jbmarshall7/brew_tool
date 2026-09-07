@@ -353,6 +353,13 @@ class Store:
                 "This mead is stabilized — the yeast is inhibited and cannot "
                 "carbonate. Bottle-conditioning needs live yeast; record a "
                 "reason if you re-pitched a fresh champagne strain")
+        if not calc.is_stable(batch) and not (override_reason or "").strip():
+            raise ValueError(
+                "This mead has not held a steady gravity for "
+                f"{calc.STABLE_DAYS} days yet — priming a mead that is still "
+                "fermenting adds sugar on top of the sugar it hasn't finished, "
+                "and the bottles can burst. Log a couple of flat readings "
+                "first, or record a reason to override")
         d = calc.priming_sugar(calc.current_volume(batch), vols, temp, sugar)
         entry = {"at": calc.fmt_when(calc.parse_when(at) if at
                                      else datetime.now()),

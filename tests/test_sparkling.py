@@ -83,6 +83,38 @@ class PrimingRecordTest(SparklingTestCase):
         self.assertEqual(pr["tax_class"], "sparkling / carbonated")
         self.assertTrue(calc.is_primed(b))
 
+    def test_a_still_fermenting_mead_cannot_be_primed(self):
+        # the high-severity bug the review caught: priming a working ferment
+        # feeds the yeast the priming sugar PLUS the leftover sugar -> bottle
+        # bombs. This batch is set up flat/stable in setUp; make it move.
+        self.store.add_reading("B-2026-003", "1.030", at="2026-09-04T09:00")
+        self.assertFalse(calc.is_stable(self.store.load_batch("B-2026-003")))
+        with self.assertRaisesRegex(ValueError, "still\s+fermenting"):
+            self.store.record_priming("B-2026-003", "2.5", "68")
+        self.assertIsNone(self.file().get("primings"))
+        # ...overridable with a recorded reason (you know it is done)
+        b, _ = self.store.record_priming("B-2026-003", "2.5", "68",
+                                         override_reason="flat by taste")
+        self.assertEqual(self.file()["primings"][0]["override"], "flat by taste")
+
+    def test_a_primed_batch_never_reads_stuck(self):
+        # the arc-gate bug: a primed batch omitted from the finishing gate fell
+        # through to the fermentation rules and could read "Stuck"
+        self.store.record_priming("B-2026-003", "2.5", "68")
+        a = calc.next_action(self.store.load_batch("B-2026-003"),
+                             datetime(2026, 9, 20, 10, 0), "Fermaid O")
+        self.assertEqual(a["tag"], "Ready to bottle")
+        self.assertIn("Primed", a["text"])
+        self.assertNotIn("Stuck", a["text"])
+
+    def test_the_prime_form_warns_a_working_ferment(self):
+        self.store.add_reading("B-2026-003", "1.030", at="2026-09-04T09:00")
+        body = dispatch(Request("GET", "/batches/B-2026-003",
+                                {"prime_vols": "2.5", "prime_temp": "68"}, {},
+                                ("B-2026-003",), self.store)).body
+        self.assertIn("over-carbonates and bursts bottles", body)
+        self.assertIn("It is not steady yet", body)     # the override affordance
+
     def test_a_stabilized_mead_cannot_be_primed(self):
         self.store.record_stabilize("B-2026-003", "3.4")
         with self.assertRaisesRegex(ValueError, "cannot carbonate"):
