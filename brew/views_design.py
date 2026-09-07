@@ -15,7 +15,8 @@ LEDE = ("Two numbers in — a volume and a strength — and the whole bench "
         "until you name it.")
 
 DEFAULTS = {"gal": "6", "abv": "12", "og": "", "fg": "1.000", "yeast": "71B",
-            "demand": "medium", "additions": "4"}
+            "demand": "medium", "additions": "4",
+            "fruit": "", "fruit_lb": "", "fruit_pct": ""}
 # a blank here has no meaning, so it falls back to the default; a blank
 # abv or og does mean something (strength set the other way)
 BLANK_IS_DEFAULT = ("gal", "fg", "demand", "additions", "yeast")
@@ -58,7 +59,8 @@ def inputs_from(params):
 def plan_from(inp):
     return calc.plan(inp["gal"], inp["abv"], inp["og"], inp["fg"],
                      inp["yeast"], inp["demand"], "fermaid-o",
-                     inp["additions"])
+                     inp["additions"], fruit=inp.get("fruit"),
+                     fruit_lb=inp.get("fruit_lb"), fruit_pct=inp.get("fruit_pct"))
 
 
 def targets_card(inp, p=None, store=None):
@@ -76,11 +78,23 @@ def targets_card(inp, p=None, store=None):
         strains.append(current)
         known = current
     more_open = by_og or inp["fg"] not in ("1.000", "1", "1.0")
-    more = details("More: finish gravity, or set the OG instead",
+    fruit_on = bool(str(inp.get("fruit_lb", "")).strip())
+    fruit_list = "".join(f'<option value="{esc(k)}">'
+                         for k in calc.FRUIT_SUGAR_PCT if k != "other")
+    more = details("More: finish gravity, set OG instead, or add fruit "
+                   "(melomel)",
                    f"""<div class="inner"><div class="grid">
 <span>{field("fg", "Finish FG", inp["fg"], "1.000 is dry. 71B at 14 % may finish a few points higher.")}</span>
 <span>{field("og", "Set OG instead", inp["og"], "Leave blank to set strength by ABV.")}</span>
-</div></div>""", open_=more_open)
+</div>
+<h3 style="font-size:15px;margin:16px 0 2px">Fruit — for a melomel</h3>
+<p class="mut">Leave blank for a traditional. Fruit supplies some of the sugar, so the honey drops to match.</p>
+<div class="grid">
+<span>{field("fruit", "Fruit", inp.get("fruit", ""), "blueberry, raspberry, cherry, apple, peach, blackberry, strawberry, currant — or any name with a sugar %.", typ="text", attrs='list="fruits"')}
+<datalist id="fruits">{fruit_list}</datalist></span>
+<span>{field("fruit_lb", "Fruit (lb)", inp.get("fruit_lb", ""), "Fresh weight going into the must.")}</span>
+<span>{field("fruit_pct", "Sugar % (only if unlisted)", inp.get("fruit_pct", ""), "Fermentable sugar by weight.")}</span>
+</div></div>""", open_=more_open or fruit_on)
     return f"""<div class="card">
 <h2>Targets</h2>
 {field("gal", "Batch volume (gal)", inp["gal"], "Your carboys: 5, 6, 6.8.")}

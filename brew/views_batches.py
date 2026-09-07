@@ -129,6 +129,56 @@ def log_form(batch_id, params=None):
             "comes from the must record.</p></div></form>")
 
 
+def flavor_section(b):
+    """Fruit, spice and oak that went into this batch, with contact time and a
+    way to pull what is still steeping."""
+    bid = b["id"]
+    now = datetime.now()
+    fls = b.get("flavors") or []
+    rows = []
+    for i, fl in enumerate(fls):
+        contact = ""
+        if fl.get("kind") in ("oak", "spice"):
+            if fl.get("pulled_at"):
+                contact = f"{calc.day_of(fl['at'], fl['pulled_at'])} days, pulled"
+            else:
+                d = calc.day_of(fl["at"], now)
+                contact = f"{d} day{'s' if d != 1 else ''} in"
+        qty = (f"{num(fl['qty'])} {fl.get('unit', '')}"
+               if fl.get("qty") is not None else "")
+        pull = ""
+        if fl.get("kind") in ("oak", "spice") and not fl.get("pulled_at"):
+            pull = raw(f'<form class="mini noprint" method="post" '
+                       f'action="/batches/{esc(bid)}/pull-flavor">'
+                       f'{hidden("index", str(i))}'
+                       f'<button class="quiet">Pull it</button></form>')
+        rows.append([when(fl["at"]), fl["kind"], fl["item"], qty,
+                     contact, pull or (fl.get("note") or "")])
+    table_html = table(["When", "Kind", "Item", "Qty", "Contact", ""], rows,
+                       empty="No fruit, spice or oak recorded.")
+    form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/flavor">
+<div class="grid">
+<span><label for="fl-kind">Kind</label><select id="fl-kind" name="kind">
+<option>fruit</option><option>spice</option><option>oak</option><option>other</option></select></span>
+<span>{field("item", "What", "", "blueberries, star anise, medium-toast oak…", typ="text", required=True, id_="fl-item")}</span>
+<span>{field("qty", "How much", "", "Optional.", id_="fl-qty")}</span>
+<span>{field("unit", "Unit", "lb", None, typ="text", id_="fl-unit")}</span>
+</div>{field("note", "Note", "", "Primary or secondary? Toast level?", typ="text", id_="fl-note")}
+<button>Record addition</button></form>"""
+    watching = calc.flavors_in_contact(b, now)
+    lead = ""
+    if watching:
+        longest = max(watching, key=lambda w: w["days"])
+        if longest["days"] >= 7:
+            lead = banner(f"{longest['item']} has steeped {longest['days']} "
+                          "days — taste it; over-extraction doesn't come out.",
+                          "warn" if longest["days"] >= calc.OAK_WATCH_DAYS
+                          else "ok")
+    return (f'<h2>Fruit, spice &amp; oak</h2>{lead}{table_html}'
+            + details("Record fruit, spice or oak", f'<div class="inner">{form}</div>',
+                      open_=not fls))
+
+
 def _fin_step(title, done_summary, action):
     """One finishing step: a done summary, or the action that does it."""
     body = done_summary if done_summary else action
@@ -382,6 +432,7 @@ def batch(req):
     body = (head + log_form(b["id"], req.params)
             + f'<div class="sheet-head"><h2>The log</h2>{toggle}</div>{seen}'
             + finishing_card(b, req.params)
+            + flavor_section(b)
             + f'<h2>Must day, kept</h2>{card(facts)}'
             + feed + notes
             + next_link(f"/recipes/{esc(r.get('slug') or '')}",
@@ -511,6 +562,34 @@ def bottle(req):
     return redirect(f"/batches/{bid}",
                     f"Bottled {pk['units']} × {pk['unit']}. That is the batch "
                     "done — nicely done.", "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/flavor")
+def flavor(req):
+    bid = req.args[0]
+    f = req.form
+    try:
+        b = req.store.record_flavor(bid, f.get("kind"), f.get("item"),
+                                    f.get("qty"), f.get("unit", ""),
+                                    note=f.get("note", ""))
+    except ValueError as e:
+        return redirect(f"/batches/{bid}", str(e), "err")
+    fl = b["flavors"][-1]
+    tail = (" — taste on a schedule and pull it when it's right"
+            if fl["kind"] in ("oak", "spice") else "")
+    return redirect(f"/batches/{bid}",
+                    f"Recorded {fl['item']} ({fl['kind']}){tail}.", "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/pull-flavor")
+def pull_flavor(req):
+    bid = req.args[0]
+    try:
+        b = req.store.pull_flavor(bid, int(req.form.get("index", "-1")))
+    except (ValueError, TypeError) as e:
+        return redirect(f"/batches/{bid}", str(e), "err")
+    return redirect(f"/batches/{bid}", "Pulled — its contact clock is stopped.",
+                    "ok")
 
 
 @route("GET", "/batches")

@@ -17,6 +17,25 @@ from datetime import datetime, timedelta
 # --- from mead_calc.py, verbatim -------------------------------------------
 ABV_FACTOR = 131.25            # ABV ≈ (OG-FG)*131.25
 PPG_PER_LB_HONEY = 35          # gravity points per lb honey per gallon of must
+# Gravity points from one pound of PURE sugar dissolved in one gallon (~46
+# ppg). Fruit contributes gravity only through its fermentable sugar, so:
+# sugar_lb = fruit_lb × sugar_fraction, and points = sugar_lb × 46 / gallons.
+SUGAR_PPG = 46
+# Fermentable sugar as a fraction of fresh fruit weight — planning figures for
+# ripe fruit (from the production skill's reference). Real fruit varies with
+# ripeness, season and variety by several points, so a melomel OG computed
+# from these is a target to confirm with a hydrometer once the fruit has given
+# up its sugar. `None` means "no table value — give a percentage explicitly",
+# because guessing an unlisted fruit is how a melomel lands 2 % ABV off.
+FRUIT_SUGAR_PCT = {
+    "blueberry": 0.10, "raspberry": 0.05, "cherry": 0.12, "apple": 0.13,
+    "peach": 0.09, "blackberry": 0.10, "strawberry": 0.05, "currant": 0.10,
+    "other": None,
+}
+# Fresh fruit is mostly water, so it also adds volume — about a gallon per this
+# many pounds. A planning figure; the batch volume after fruit is what the
+# hydrometer reads against.
+FRUIT_LB_PER_GAL = 9.0
 LB_PER_GAL_WATER = 8.34
 # target ppm YAN per 1% potential ABV, by the yeast's nitrogen demand
 YAN_PER_ABV = {"low": 9.0, "medium": 12.5, "high": 15.0}
@@ -55,6 +74,10 @@ SORBATE_LOW_ABV = 10.0
 # tool will not compute a stabilizing dose until this holds.
 STABLE_PTS = 2.0
 STABLE_DAYS = 2
+# Oak and spice keep extracting until pulled, and over-extraction is the one
+# flavor mistake you cannot walk back. Past this many days in contact, the
+# tool starts saying taste it.
+OAK_WATCH_DAYS = 14
 PH_FLOOR = 3.2
 PH_LOW_WATCH = 3.5               # below this it will likely crash in primary
 PH_NORMAL = (3.7, 4.2)
@@ -98,6 +121,11 @@ def blank(value):
 
 
 # --- gravity and alcohol ----------------------------------------------------
+def num_(x, dp=2):
+    ss = f'{round(float(x), dp):.{dp}f}'.rstrip('0').rstrip('.')
+    return ss if ss not in ('', '-0') else '0'
+
+
 def points(sg):
     return (sg - 1.0) * 1000.0
 
@@ -201,6 +229,51 @@ def honey_gal(honey_lb):
 def water_gal(gallons, honey_lb):
     """Water to start with: the batch volume less the honey's own volume."""
     return round(gallons - honey_gal(honey_lb), 2)
+
+
+def fruit_sugar_pct(fruit, pct=None):
+    """Fermentable sugar fraction for a named fruit, or an explicit override.
+
+    Accepts 10 as readily as 0.10 — nobody types a fraction with wet hands.
+    An unlisted fruit needs a percentage given, never a silent guess.
+    """
+    if pct is not None and str(pct).strip() != "":
+        pct = float(pct)
+        if pct <= 0:
+            raise ValueError("sugar percentage must be above zero")
+        return pct / 100.0 if pct > 1 else pct
+    key = (fruit or "").strip().lower()
+    if key not in FRUIT_SUGAR_PCT or FRUIT_SUGAR_PCT[key] is None:
+        known = ", ".join(sorted(k for k in FRUIT_SUGAR_PCT if k != "other"))
+        raise ValueError(f"no sugar percentage on file for '{fruit}' — give "
+                         f"one explicitly (known: {known})")
+    return FRUIT_SUGAR_PCT[key]
+
+
+def fruit_points(lbs, pct, gallons):
+    """Gravity points `lbs` of fruit at `pct` sugar adds to `gallons` of must."""
+    if gallons <= 0:
+        raise ValueError("gallons must be above zero")
+    return round(lbs * pct * SUGAR_PPG / gallons, 1)
+
+
+def fruit_gal(lbs):
+    """The volume fresh fruit brings with it — mostly water."""
+    return round(lbs / FRUIT_LB_PER_GAL, 2)
+
+
+def honey_for_og_with_fruit(gallons, og, fruit_lb=0.0, fruit_sugar=0.0,
+                            ppg=PPG_PER_LB_HONEY):
+    """lb of honey to reach `og` when fruit already supplies some of the sugar.
+
+    The fruit's points come off the target first; honey makes up the rest. If
+    the fruit alone would overshoot the target, no honey is needed and the
+    shortfall is negative — the caller warns.
+    """
+    target_pts = points(og)
+    fpts = fruit_points(fruit_lb, fruit_sugar, gallons) if fruit_lb else 0.0
+    honey_pts = target_pts - fpts
+    return round(max(honey_pts, 0.0) * gallons / ppg, 2), round(fpts, 1)
 
 
 def expected_og(honey_lb, gallons, ppg=PPG_PER_LB_HONEY):
@@ -432,7 +505,7 @@ def schedule(pitched_at, og, fg, gallons, demand="medium", product="fermaid-o",
 # --- the whole plan ---------------------------------------------------------
 def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
          demand="medium", product="fermaid-o", additions=TOSNA_ADDITIONS,
-         ppg=PPG_PER_LB_HONEY):
+         ppg=PPG_PER_LB_HONEY, fruit=None, fruit_lb=None, fruit_pct=None):
     """Everything the bench needs for `gal` of must at a target strength.
 
     Strength is set by ABV (the usual way) or by OG; whichever is given wins
@@ -465,9 +538,23 @@ def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
     yeast = y["g"]
     strain = (strain or "").strip() or "71B"
 
-    honey_lb = honey_for_og(gal, og, ppg)
+    # fruit, if any, supplies some of the sugar; honey makes up the rest
+    fruit_info = None
+    if not blank(fruit_lb):
+        flb = num(fruit_lb, "fruit weight", 0.01, 10000, " lb")
+        fname = (fruit or "").strip() or "other"
+        fpct = fruit_sugar_pct(fname, fruit_pct)
+        honey_lb, fpts = honey_for_og_with_fruit(gal, og, flb, fpct, ppg)
+        fruit_info = {"item": fname, "lb": flb, "sugar_pct": round(fpct * 100, 1),
+                      "sugar_lb": round(flb * fpct, 2), "points": fpts,
+                      "gal": fruit_gal(flb),
+                      "over": honey_lb <= 0 and fpts > points(og)}
+    else:
+        honey_lb = honey_for_og(gal, og, ppg)
     hg = honey_gal(honey_lb)
-    wg = water_gal(gal, honey_lb)
+    # fruit brings its own volume, so the water target drops by that too
+    wg = round(water_gal(gal, honey_lb)
+               - (fruit_info["gal"] if fruit_info else 0.0), 2)
     gf_g, gf_ml = goferm(yeast)
     ppm = yan_ppm(target_abv, demand)
     total = nutrient_grams(ppm, gal, product)
@@ -478,6 +565,12 @@ def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
     note = tolerance_note(strain, target_abv)
     if note:
         warnings.append(note)
+    if fruit_info and fruit_info["over"]:
+        warnings.append(
+            f"{num_(fruit_info['lb'])} lb of {fruit_info['item']} alone would "
+            f"pass OG {sg_text(og)} — no honey needed, and the mead will be "
+            "stronger and fruitier than the target. Use less fruit, or aim "
+            "higher.")
     return {
         "strength_by": by, "gal": gal, "abv": round(target_abv, 2), "og": og,
         "fg": fg, "target_pts": round(points(og), 1),
@@ -490,7 +583,7 @@ def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
         "demand": demand, "product": product, "additions": n,
         "yan_ppm": ppm, "nutrient_g": total, "per_addition_g": per,
         "third_break_sg": stop, "feed_rows": feed_rules(n, stop),
-        "abv_if_dry": dry, "warnings": warnings,
+        "abv_if_dry": dry, "warnings": warnings, "fruit": fruit_info,
         "constants": {
             "ABV_FACTOR": ABV_FACTOR, "PPG_PER_LB_HONEY": ppg,
             "HONEY_LB_PER_GAL": HONEY_LB_PER_GAL,
@@ -614,6 +707,27 @@ def is_bottled(batch):
     return bool(batch.get("packaging"))
 
 
+def flavors_in_contact(batch, now):
+    """Oak and spice still in the mead, with how many days they have steeped.
+
+    Fruit is not watched — it gives up its sugar and stays; oak and spice
+    keep pulling tannin and aroma until you physically remove them.
+    """
+    out = []
+    for i, fl in enumerate(batch.get("flavors") or []):
+        if fl.get("kind") not in ("oak", "spice"):
+            continue
+        if fl.get("pulled_at"):
+            continue
+        try:
+            days = day_of(fl["at"], now)
+        except (ValueError, KeyError):
+            continue
+        out.append({"i": i, "item": fl.get("item"), "kind": fl.get("kind"),
+                    "days": days})
+    return out
+
+
 def feeds_given(batch):
     """The numbers of the feedings actually recorded as given."""
     return {f.get("n") for f in batch.get("feeds") or [] if f.get("n")}
@@ -706,6 +820,16 @@ def next_action(batch, now=None, product="Fermaid O"):
                 f"{product} #{feed['n']}, {_g1(feed['g'])} g — {whenever}. "
                 f"Stop at SG {sg_text(feed.get('stop_sg') or stop)} whatever "
                 "the calendar says.")
+
+    # 1b — oak or spice steeping too long: unfixable if you miss it
+    for fl in flavors_in_contact(batch, now):
+        if fl["days"] >= OAK_WATCH_DAYS:
+            return warn("Taste the oak" if fl["kind"] == "oak"
+                        else "Taste the spice",
+                        f"{esc_free(fl['item'])} has been in "
+                        f"{fl['days']} days — taste it. Over-extraction is the "
+                        "one flavor you cannot pull back; pull it when it is "
+                        "right.")
 
     # 2 — the finishing arc: once the mead is down and still (or already
     # part-way through finishing), the next physical step outranks the
