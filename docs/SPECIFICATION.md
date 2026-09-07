@@ -380,19 +380,74 @@ must day. Keep it that way: **one dish at a time, and only when hungry for it.**
 
 ---
 
-## 6. Open questions for the owner
+## 6. The owner's answers, and the resulting order
 
-These change what gets built and in what order — worth answering before pulling
-from 4.B or below.
+The five questions below were answered on 2026-09-06. They change the roadmap
+from an abstract tiering into a concrete sequence, recorded here so the order is
+not re-litigated every session.
 
-1. **Are you licensed (TTB / state), and do you self-file?** Gates C2, C3, B4
-   entirely. If no, they never come up.
-2. **Do you sell or give away enough that you lose count of a bottling?** Gates
-   B2, and B4 through it.
-3. **How many batches run at once, realistically?** Below three, B1 (the vessel
-   schedule) is noise; at a full cellar it leads.
-4. **Do you make anything sparkling / bottle-conditioned?** Reopens the priming
-   math deferred in round 3, and changes the finishing arc.
-5. **The stock question (A4): is "how much honey is left" a real weekly
-   friction, or does a glance at the drum answer it?** If the latter, we keep
-   that item permanently unbuilt — which is a feature, not a gap.
+### 6.1 The answers
+
+1. **Licensed?** Yes — TTB and the State of Connecticut, and Warblers
+   **self-files.** So the tax, TTB-operations and compliance-document
+   capabilities are real recurring obligations, not hypothetical. The tool's
+   posture is unchanged: it produces worksheets and keeps records; it never
+   files and never renders a tax or legal determination.
+2. **Lose count of a bottling?** Not from sales yet, but there will be
+   **sampling bottles** that may account for loss — unclear whether the volume
+   is material enough to report. The tool records samples as dispositions and
+   lets the TTB worksheet surface them; the operator classifies, the tool does
+   not decide materiality.
+3. **How many batches at once?** **Two now, eight soon.** A cellar heading for
+   eight makes "which vessel is free / when does it come free" a daily question
+   and makes memory aids (tasting notes, recipe versions) worth having before
+   the count climbs.
+4. **Sparkling?** **Yes, some sessions.** This reopens the priming-sugar math
+   deferred in round 3 and adds a sparkling branch to the finishing arc:
+   bottle-conditioned mead is *not* stabilized, is primed with a computed sugar
+   amount into pressure-rated bottles, and lands in a higher excise tax class —
+   which ties back to answer 1.
+5. **Is honey-on-hand weekly friction?** **No** — a glance at the drum answers
+   it. So the featherweight stock (A4) stays **permanently unbuilt.** The owner
+   has removed the one item most likely to drag the old app's inventory sprawl
+   back in. Treated as a settled decision, not a gap.
+
+### 6.2 The resulting order
+
+Leverage-ordered given the answers, with dependencies respected. Still a menu —
+one at a time, used on a real batch before the next — but this is the sequence
+absent a reason to depart from it.
+
+1. **Fruit, spice and oak additions** (was A1). Smallest, the math already
+   exists unported, no dependency, and it unblocks a style the owner has tried
+   to make. Build first.
+2. **Sparkling finishing branch** (from answer 4; the round-3 deferral). Extends
+   the finishing arc already built: a bottle-conditioning path that primes
+   instead of stabilizing, computes priming sugar for a target volume of CO₂,
+   and flags the sparkling tax class at design — deciding carbonation early,
+   because it changes the excise rate the tax worksheet will later need.
+3. **Tasting notes** (was A3) and **recipe versioning** (was A2). Cheap memory
+   and iteration aids, most valuable *before* the cellar fills to eight batches
+   nobody can hold in their head.
+4. **Vessel schedule** (was B1). Promoted by the 2→8 trajectory. Build as the
+   live-batch count passes roughly four; below that it is noise, at eight it
+   leads.
+5. **Dispositions, including samples** (was B2). The data foundation the
+   compliance layer stands on — where bottles and sample pours went, on-hand
+   derived. Needed for answer 2 and as the input to everything in 6–7.
+6. **TTB Report of Wine Premises Operations** (was B4) and
+   **document-expiry surfacing** (the light half of C3). The licensed-operator
+   compliance layer, once dispositions feed it: the F 5120.17 lines derived from
+   batches and dispositions, and permit/COA/insurance renewal dates surfaced on
+   Today. A lapsed permit is a bad surprise the tool can prevent.
+7. **Excise worksheets — federal + CT, with the CBMA credit** (was C2). The
+   heaviest, last, once removals data exists and the sparkling tax class is
+   modelled. Worksheets that state their derivations; rates are
+   operator-maintained data; it never files. Even here, keep asking whether a
+   given piece is better served by the owner's accountant.
+
+The full label / COLA / approval machinery (the heavy half of C3) and the full
+lot-inventory + traceability layer (C4) remain **deferred** — build only if
+distribution or employees make them unavoidable, per section 4.
+
+---
