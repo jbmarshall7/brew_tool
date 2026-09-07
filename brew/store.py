@@ -262,6 +262,11 @@ class Store:
         if calc.is_stabilized(batch) and not (override_reason or "").strip():
             raise ValueError(f"{batch_id} is already stabilized — a second "
                              "dose needs a recorded reason")
+        if calc.is_primed(batch) and not (override_reason or "").strip():
+            raise ValueError(
+                "This mead is primed to bottle-condition — stabilizing it now "
+                "kills the yeast and it will never carbonate. Record a reason "
+                "if you mean to abandon the sparkling plan")
         if not calc.is_stable(batch) and not (override_reason or "").strip():
             raise ValueError(
                 "This mead has not held a steady gravity for "
@@ -312,6 +317,35 @@ class Store:
         self.save_batch(batch)
         return batch, honey
 
+    def record_priming(self, batch_id, target_vols, temp_f, sugar="honey",
+                       at=None, note="", override_reason=None):
+        """Prime for bottle-conditioning: the sugar that live yeast will turn
+        into fizz. Refused on a stabilized mead — sorbate and sulfite kill the
+        yeast, so it cannot carbonate — unless a reason is recorded (you
+        re-pitched fresh champagne yeast)."""
+        from . import calc
+        batch = self.load_batch(batch_id)
+        vols = calc.num(target_vols, "target volumes of CO2", 0.5, 6.0)
+        temp = calc.num(temp_f, "temperature", 32, 100, " °F")
+        if calc.is_stabilized(batch) and not (override_reason or "").strip():
+            raise ValueError(
+                "This mead is stabilized — the yeast is inhibited and cannot "
+                "carbonate. Bottle-conditioning needs live yeast; record a "
+                "reason if you re-pitched a fresh champagne strain")
+        d = calc.priming_sugar(calc.current_volume(batch), vols, temp, sugar)
+        entry = {"at": calc.fmt_when(calc.parse_when(at) if at
+                                     else datetime.now()),
+                 "target_vols": d["target_vols"], "temp_f": d["temp_f"],
+                 "sugar": sugar, "grams": d["grams"], "co2_g": d["co2_g"],
+                 "residual_vols": d["residual_vols"],
+                 "tax_class": d["tax_class"], "note": (note or "").strip()}
+        if (override_reason or "").strip():
+            entry["override"] = override_reason.strip()
+        batch.setdefault("primings", []).append(entry)
+        batch["primings"].sort(key=lambda x: x.get("at") or "")
+        self.save_batch(batch)
+        return batch, d
+
     def record_bottling(self, batch_id, units, unit, at=None, note=""):
         """Bottle it: the terminal event. Units and the package they went in."""
         from . import calc
@@ -321,10 +355,18 @@ class Store:
         units = int(calc.num(units, "bottle count", 1, 100000))
         unit = (unit or "").strip() or "bottle"
         when = calc.parse_when(at) if at else datetime.now()
-        batch["packaging"] = {
+        pkg = {
             "at": calc.fmt_when(when), "units": units, "unit": unit,
             "volume_gal": calc.current_volume(batch),
             "note": (note or "").strip()}
+        if calc.is_primed(batch):
+            pr = batch["primings"][-1]
+            pkg["conditioned"] = True
+            pkg["target_vols"] = pr["target_vols"]
+            pkg["tax_class"] = pr["tax_class"]
+        else:
+            pkg["tax_class"] = "still"
+        batch["packaging"] = pkg
         self.save_batch(batch)
         return batch
 

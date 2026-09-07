@@ -189,7 +189,10 @@ class FinishingArcTest(FinishTestCase):
         self.flat()
         self.assertIn("rack it off the lees", self.act()["text"])
         self.store.record_racking("B-2026-003", "5.7", at="2026-09-03T09:00")
-        self.assertIn("Stabilize with sorbate and sulfite", self.act()["text"])
+        # the fork: still (stabilize) or sparkling (prime)
+        forked = self.act()["text"]
+        self.assertIn("stabilize", forked)
+        self.assertIn("sparkling", forked)
         self.store.record_stabilize("B-2026-003", "3.4", at="2026-09-03T12:00")
         a = self.act()
         self.assertIn("Back-sweeten to taste", a["text"])

@@ -234,6 +234,20 @@ vessel — every dose below is per that gallon.</p>
         stab = _stabilize_action(b, params, vol, og, now_sg)
         steps.append(_fin_step("Stabilize", "", stab))
 
+    # 2b — carbonate (sparkling): the alternative to stabilizing
+    if calc.is_primed(b):
+        pr = b["primings"][-1]
+        summary = kv([("Primed",
+                       f"{num(pr['grams'])} g {pr['sugar']} → "
+                       f"{num(pr['target_vols'])} volumes",
+                       f"{when(pr['at'])} · {pr['tax_class']}"
+                       + (f" · override: {pr['override']}"
+                          if pr.get("override") else ""))])
+        steps.append(_fin_step("Carbonate (sparkling)", summary, ""))
+    elif not calc.is_stabilized(b):
+        steps.append(_fin_step("Carbonate (sparkling)", "",
+                               _prime_action(b, params, vol)))
+
     # 3 — back-sweeten (preview then record)
     if calc.is_sweetened(b):
         sw = b["sweetenings"][-1]
@@ -318,6 +332,61 @@ def _stabilize_form(b, _):
 This previews the amounts — it writes nothing.</p>
 {field("stab_ph", "Measured pH now", "", "The dose depends on it: lower pH needs far less sulfite.", step="0.01")}
 <button class="quiet">Show the dose</button></form>"""
+
+
+def _prime_action(b, params, vol):
+    """Preview the priming sugar (a GET that writes nothing), then record."""
+    bid = b["id"]
+    vols, temp = params.get("prime_vols"), params.get("prime_temp")
+    sugar = params.get("prime_sugar") or "honey"
+    if not calc.blank(vols) and not calc.blank(temp):
+        try:
+            d = calc.priming_sugar(vol, calc.num(vols, "volumes", 0.5, 6),
+                                   calc.num(temp, "temperature", 32, 100),
+                                   sugar if sugar in calc.SUGAR_YIELD else "honey")
+        except ValueError as e:
+            return banner(str(e), "err") + _prime_form(b, vol)
+        taxline = ("Under ~2 volumes it stays a still wine for excise."
+                   if not d["over_still"] else
+                   "Over ~2 volumes — this is a sparkling / carbonated wine for "
+                   "TTB, a higher excise class than still. Decide before you "
+                   "prime.")
+        pre = banner(
+            f"For {num(d['gallons'])} gal to {num(d['target_vols'])} volumes "
+            f"(it already holds ~{num(d['residual_vols'])} at "
+            f"{num(d['temp_f'])} °F): {num(d['grams'])} g {d['sugar']} "
+            f"({num(d['grams_per_gal'])} g/gal). Bottle in pressure-rated "
+            f"bottles only — champagne or heavy crown-cap glass. {taxline}",
+            "warn" if d["over_still"] else "ok")
+        override = "" if not calc.is_stabilized(b) else details(
+            "It is stabilized, but I re-pitched fresh yeast",
+            '<div class="inner">' + field("override", "Reason (recorded)", "",
+            "e.g. pitched EC-1118 at bottling.", typ="text") + "</div>")
+        rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/prime">
+{hidden("target_vols", num(d['target_vols']))}{hidden("temp_f", num(d['temp_f']))}
+{hidden("sugar", d['sugar'])}{field("note", "Note", "", None, typ="text")}{override}
+<button>Record priming</button></form>"""
+        return pre + rec
+    return _prime_form(b, vol)
+
+
+def _prime_form(b, vol):
+    bid = b["id"]
+    warn = "" if not calc.is_stabilized(b) else banner(
+        "This mead is stabilized — the yeast is inhibited and will not "
+        "carbonate unless you re-pitch fresh yeast.", "warn")
+    opts = "".join(f"<option{' selected' if k == 'honey' else ''}>{k}</option>"
+                   for k in calc.SUGAR_YIELD)
+    return f"""{warn}<form class="inline" method="get" action="/batches/{esc(bid)}#finish">
+<p class="mut">For a sparkling mead: do NOT stabilize. Prime with sugar the live
+yeast will carbonate, then bottle in pressure-rated bottles. This previews the
+amount — it writes nothing.</p>
+<div class="grid">
+<span>{field("prime_vols", "Target volumes of CO₂", "2.5", "Still ~0, lightly sparkling 1.5–2.5, champagne-style 3+.", step="0.1")}</span>
+<span>{field("prime_temp", "Warmest it has sat (°F)", "68", "Sets how much CO₂ is already dissolved.")}</span>
+<span><label for="ps">Priming sugar</label><select id="ps" name="prime_sugar">{opts}</select></span>
+</div>
+<button class="quiet">Show the sugar</button></form>"""
 
 
 def _sweeten_action(b, params, vol, now_sg):
@@ -547,6 +616,24 @@ def sweeten(req):
         f"/batches/{bid}",
         f"Back-sweetened to {sg(sw['to_sg'])} with {num(honey)} lb honey. "
         "Confirm with a hydrometer, taste, then bottle.", "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/prime")
+def prime(req):
+    bid = req.args[0]
+    f = req.form
+    try:
+        b, d = req.store.record_priming(
+            bid, f.get("target_vols"), f.get("temp_f"),
+            f.get("sugar", "honey"), note=f.get("note", ""),
+            override_reason=f.get("override", ""))
+    except ValueError as e:
+        return redirect(f"/batches/{bid}#finish", str(e), "err")
+    return redirect(
+        f"/batches/{bid}",
+        f"Primed to {num(d['target_vols'])} volumes with {num(d['grams'])} g "
+        f"{d['sugar']}. Bottle in pressure-rated bottles; it is a "
+        f"{d['tax_class']} wine for excise.", "ok")
 
 
 @route("POST", r"/batches/(B-\d{4}-\d{3})/bottle")

@@ -78,6 +78,19 @@ STABLE_DAYS = 2
 # flavor mistake you cannot walk back. Past this many days in contact, the
 # tool starts saying taste it.
 OAK_WATCH_DAYS = 14
+# --- carbonation / bottle-conditioning (sparkling) --------------------------
+# Priming: CO2_to_add(g) = (target_vols - residual_vols) * 1.969 g/L/vol * L,
+# then sugar_g = CO2_g / yield. Yields are g CO2 per g of that sugar (McGill
+# 2006; honey = ~0.78 fermentable sugar x 0.51 sucrose yield). Residual CO2 is
+# the standard Henry's-law polynomial in the highest post-ferment temp (°F).
+# Sources cross-checked against 27 CFR 24.10/24.245 and brewing references.
+CO2_G_PER_VOL_PER_L = 1.969
+SUGAR_YIELD = {"honey": 0.40, "table sugar": 0.51, "corn sugar": 0.44}
+# TTB: still wine is <= 0.392 g CO2/100 mL (27 CFR 24.10). Above that it is
+# sparkling / artificially carbonated, and the federal excise roughly triples
+# ($1.07 -> $3.30-$3.40 per gal), which is why carbonation is decided at design.
+TTB_STILL_CO2_G_PER_100ML = 0.392
+TTB_STILL_VOLS = round(TTB_STILL_CO2_G_PER_100ML * 10 / CO2_G_PER_VOL_PER_L, 2)
 PH_FLOOR = 3.2
 PH_LOW_WATCH = 3.5               # below this it will likely crash in primary
 PH_NORMAL = (3.7, 4.2)
@@ -203,6 +216,45 @@ def stabilize_doses(gallons, ph, abv_now, molecular=MOLECULAR_SO2_TARGET):
         "sorbate_g": sorb["g"], "sorbate_ppm": sorb["ppm"],
         "sorbate_rate": sorb["rate"], "sorbate_stepped_up": sorb["stepped_up"],
     }
+
+
+def residual_co2_vols(temp_f):
+    """CO2 already dissolved, in volumes, at the warmest the mead sat at.
+    Standard Henry's-law polynomial; clamped at zero."""
+    v = 3.0378 - 0.050062 * temp_f + 0.00026555 * temp_f * temp_f
+    return round(max(v, 0.0), 2)
+
+
+def co2_tax_class(target_vols):
+    """Which TTB excise class a carbonation level lands in."""
+    return ("still" if target_vols <= TTB_STILL_VOLS
+            else "sparkling / carbonated")
+
+
+def priming_sugar(gallons, target_vols, temp_f, sugar="honey"):
+    """Grams of priming sugar to bottle-condition to `target_vols` of CO2.
+
+    Only the CO2 above what is already dissolved has to be made, so warm mead
+    (little residual) needs more sugar than cold. Returns the tax class too,
+    because crossing ~2 volumes changes the excise rate.
+    """
+    if sugar not in SUGAR_YIELD:
+        raise ValueError(f"prime with one of {', '.join(SUGAR_YIELD)}")
+    residual = residual_co2_vols(temp_f)
+    if target_vols <= residual:
+        raise ValueError(
+            f"the mead already holds about {residual} volumes at {num_(temp_f)} "
+            f"°F — {num_(target_vols)} needs no priming sugar")
+    liters = gallons * 3.785
+    co2_g = (target_vols - residual) * CO2_G_PER_VOL_PER_L * liters
+    grams = co2_g / SUGAR_YIELD[sugar]
+    cls = co2_tax_class(target_vols)
+    return {"gallons": round(gallons, 2), "target_vols": round(target_vols, 2),
+            "residual_vols": residual, "temp_f": round(temp_f, 1),
+            "sugar": sugar, "co2_g": round(co2_g, 1),
+            "grams": round(grams, 1),
+            "grams_per_gal": round(grams / gallons, 1) if gallons else 0,
+            "tax_class": cls, "over_still": cls != "still"}
 
 
 def backsweeten_honey(gallons, from_sg, to_sg, ppg=PPG_PER_LB_HONEY):
@@ -707,6 +759,10 @@ def is_bottled(batch):
     return bool(batch.get("packaging"))
 
 
+def is_primed(batch):
+    return bool(batch.get("primings"))
+
+
 def flavors_in_contact(batch, now):
     """Oak and spice still in the mead, with how many days they have steeped.
 
@@ -842,6 +898,12 @@ def next_action(batch, now=None, product="Fermaid O"):
             return ok("Ready to bottle",
                       f"Sweetened to {sg_text(sw.get('to_sg'))}. Taste it, "
                       "then bottle it.")
+        if is_primed(batch):
+            pr = batch["primings"][-1]
+            return ok("Ready to bottle",
+                      f"Primed to {num_(pr['target_vols'])} volumes with "
+                      f"{num_(pr['grams'])} g {esc_free(pr['sugar'])} — bottle "
+                      "it in pressure-rated bottles and let the yeast work.")
         if is_stabilized(batch):
             return ok("Ready to bottle",
                       "Stabilized — sorbate and sulfite are in. Back-sweeten "
@@ -849,9 +911,9 @@ def next_action(batch, now=None, product="Fermaid O"):
         if is_racked(batch):
             if is_stable(batch):
                 return ok("Ready to stabilize",
-                          f"Racked and steady at {sg_text(now_sg)}. Stabilize "
-                          "with sorbate and sulfite before you sweeten, or "
-                          "bottle it dry.")
+                          f"Racked and steady at {sg_text(now_sg)}. For a still "
+                          "mead, stabilize then sweeten or bottle dry; for a "
+                          "sparkling one, prime and bottle-condition instead.")
             return ok("Settling",
                       f"Racked at {sg_text(now_sg)}. Give it a few days flat "
                       "before you stabilize — sulfite will not stop a mead "
