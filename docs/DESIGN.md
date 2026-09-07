@@ -6,6 +6,18 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-06 — dispositions (round 8, roadmap B2).** A bottled batch now
+  records where its bottles went — taproom, sold, gift, sample, breakage,
+  other — and on-hand is derived (bottled − out), never stored. The batch page
+  grows a Bottles section with the count and a per-disposition log once it is
+  bottled, and the bottled sentence carries the on-hand. A disposition cannot
+  exceed what is on hand. This is the data the future TTB operations report and
+  excise worksheets will read, and it answers the owner's sampling question:
+  `sample` is its own channel, so a loss report can total the pours and let the
+  operator decide materiality. Still no customers-as-records, invoicing or
+  revenue — just where it went and how much is left.
+
+
 - **2026-09-06 — the vessel schedule (round 7, roadmap B1).** Promoted by the
   2→8 batch trajectory: a Vessels page (and nav item) lists each carboy and tank,
   free or occupied, and for an occupied one the batch it holds, that batch's

@@ -129,6 +129,41 @@ def log_form(batch_id, params=None):
             "comes from the must record.</p></div></form>")
 
 
+def dispositions_section(b):
+    """Where the bottles went, and how many are left. Only once bottled."""
+    if not calc.is_bottled(b):
+        return ""
+    bid = b["id"]
+    pk = b["packaging"]
+    made, on_hand = pk.get("units"), calc.units_on_hand(b)
+    ds = sorted(b.get("dispositions") or [], key=lambda d: d.get("at") or "",
+                reverse=True)
+    rows = [[when(d["at"]), d["kind"], str(d["qty"]), d.get("to") or "",
+             d.get("note") or ""] for d in ds]
+    tbl = table(["When", "Where", "How many", "To", "Note"], rows,
+                empty="None yet — all still on hand.")
+    stat = (f'<div class="stats"><span><span class="l">Bottled</span>'
+            f'<span class="n">{made}</span></span>'
+            f'<span><span class="l">On hand</span>'
+            f'<span class="n">{on_hand}</span></span>'
+            f'<span><span class="l">Out</span>'
+            f'<span class="n">{calc.units_disposed(b)}</span></span></div>')
+    opts = "".join(f"<option>{esc(k)}</option>" for k in calc.DISPO_KINDS)
+    form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/disposition">
+<div class="grid">
+<span><label for="d-kind">Where</label><select id="d-kind" name="kind">{opts}</select></span>
+<span>{field("qty", "How many", "", "Bottles leaving.", step="1", required=True, id_="d-qty")}</span>
+<span>{field("to", "To (optional)", "", "Who or where.", typ="text", id_="d-to")}</span>
+</div>{field("note", "Note", "", None, typ="text", id_="d-note")}
+<button>Record</button></form>"""
+    body = "" if on_hand else banner("All bottles accounted for — none left "
+                                     "on hand.", "ok")
+    return (f'<h2>Bottles — where they went</h2>{stat}{body}{tbl}'
+            + (details("Record a disposition",
+                       f'<div class="inner">{form}</div>', open_=not ds)
+               if on_hand else ""))
+
+
 def tasting_section(b):
     """Tasting notes at the checkpoints that matter, newest first."""
     bid = b["id"]
@@ -531,6 +566,7 @@ def batch(req):
     body = (head + log_form(b["id"], req.params)
             + f'<div class="sheet-head"><h2>The log</h2>{toggle}</div>{seen}'
             + finishing_card(b, req.params)
+            + dispositions_section(b)
             + flavor_section(b)
             + tasting_section(b)
             + f'<h2>Must day, kept</h2>{card(facts)}'
@@ -680,6 +716,22 @@ def bottle(req):
     return redirect(f"/batches/{bid}",
                     f"Bottled {pk['units']} × {pk['unit']}. That is the batch "
                     "done — nicely done.", "ok")
+
+
+@route("POST", r"/batches/(B-\d{4}-\d{3})/disposition")
+def disposition(req):
+    bid = req.args[0]
+    f = req.form
+    try:
+        b = req.store.record_disposition(bid, f.get("kind"), f.get("qty"),
+                                         f.get("to", ""), note=f.get("note", ""))
+    except ValueError as e:
+        return redirect(f"/batches/{bid}", str(e), "err")
+    d = b["dispositions"][-1]
+    return redirect(f"/batches/{bid}",
+                    f"{d['qty']} to {d['kind']}"
+                    + (f" ({d['to']})" if d['to'] else "")
+                    + f" — {calc.units_on_hand(b)} on hand.", "ok")
 
 
 @route("POST", r"/batches/(B-\d{4}-\d{3})/tasting")
