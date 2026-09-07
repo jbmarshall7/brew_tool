@@ -6,6 +6,17 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-06 — the vessel schedule (round 7, roadmap B1).** Promoted by the
+  2→8 batch trajectory: a Vessels page (and nav item) lists each carboy and tank,
+  free or occupied, and for an occupied one the batch it holds, that batch's
+  current gravity and state, and a link to it. Occupancy is derived — a vessel
+  is busy because a non-bottled batch names it, free the moment it is bottled —
+  so nothing is a status kept by hand, and no free-by date is fabricated that
+  the record cannot support. A batch carries an optional `vessel` set from its
+  page; vessels are a flat `data/vessels.json` of {id, name, gal}, with none of
+  the old app's maintenance/calibration/sanitation/layout machinery.
+
+
 - **2026-09-06 — tasting notes and recipe versioning (round 6, roadmap A3+A2).**
   Two memory aids, most valuable before the cellar fills to eight batches nobody
   can hold in their head. The batch page gains a Tastings section — a note at a

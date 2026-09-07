@@ -463,6 +463,12 @@ def batch(req):
 
     facts = kv([
         ("Recipe", r.get("name") or r.get("slug") or "—", None),
+        ("Vessel", b.get("vessel") or "—",
+         raw(f'<form class="mini noprint" method="post" '
+             f'action="/batches/{esc(b["id"])}/vessel" style="margin-top:4px">'
+             f'<input name="vessel" value="{esc(b.get("vessel") or "")}" '
+             f'placeholder="which vessel" style="max-width:160px">'
+             f'<button class="quiet">Set</button></form>')),
         ("In the carboy", f"{num(b.get('volume_gal'))} gal", None),
         ("Pitched", when(b.get("pitched_at")), None),
         ("Must gravity",
