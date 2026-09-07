@@ -243,8 +243,9 @@ class LogRouteTest(LogTestCase):
                        "note": "bubbling hard"})
         self.assertEqual(r.status, 303)
         self.assertTrue(r.location.startswith("/batches/B-2026-003?msg="))
+        day = calc.day_of(RECORD["pitched_at"], datetime.now())
         for piece in ("Logged%201.0708", "read%201.070%20at%2068%20%C2%B0F",
-                      "day%203", "so%20far", "attenuated"):
+                      "day%%20%d" % day, "so%20far", "attenuated"):
             self.assertIn(piece, r.location, piece)
         self.assertEqual(len(self.file()["readings"]), 1)
 
@@ -433,7 +434,7 @@ class CurveTest(LogTestCase):
 
 class TodayTest(LogTestCase):
     def test_a_quiet_cellar_says_so(self):
-        self.store.add_reading("B-2026-003", "1.088", at="2026-09-06T09:00")
+        self.store.add_reading("B-2026-003", "1.088")      # read just now
         for n in ("1", "2", "3", "4"):
             self.store.record_feed("B-2026-003", n)
         body = self.get("/").body
@@ -461,7 +462,7 @@ class TodayTest(LogTestCase):
         body = self.get("/").body
         self.assertNotIn("<polyline", body)
         self.store.add_reading("B-2026-003", "1.088", at="2026-09-04T09:00")
-        self.store.add_reading("B-2026-003", "1.070", at="2026-09-06T09:00")
+        self.store.add_reading("B-2026-003", "1.070")      # now, so: today
         body = self.get("/").body
         self.assertIn("<polyline", body)
         self.assertIn("read today", body)
@@ -473,8 +474,7 @@ class TodayTest(LogTestCase):
                               pitched_at="2026-08-20T09:00"), (), self.store))
         for n in ("1", "2", "3", "4"):
             self.store.record_feed("B-2026-004", n)
-        self.store.add_reading("B-2026-004", "1.030",
-                               at="2026-09-06T08:00")
+        self.store.add_reading("B-2026-004", "1.030")      # read just now
         body = self.get("/").body
         # the one with a feeding owed is named in a card; the quiet one is not
         cards = body[body.index("Needs you now"):body.index("In the cellar")]

@@ -291,6 +291,14 @@ WHEN_FORMATS = ("%Y-%m-%dT%H:%M", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S",
 
 
 def parse_when(text):
+    """A timestamp from a string, or a datetime passed straight back.
+
+    Callers hand this whatever they have — a field from a form, a value off
+    a JSON record, or a datetime they already built — so accepting both
+    keeps a confusing AttributeError from surfacing three frames away.
+    """
+    if isinstance(text, datetime):
+        return text
     text = (text or "").strip()
     for fmt in WHEN_FORMATS:
         try:
@@ -447,9 +455,7 @@ FINISHED_MARGIN = 0.004     # this close to FG and the sugar is gone
 
 def day_of(pitched_at, at):
     """The batch's day number at `at` — whole days since the pitch."""
-    start = pitched_at if isinstance(pitched_at, datetime) else parse_when(pitched_at)
-    when = at if isinstance(at, datetime) else parse_when(at)
-    return (when.date() - start.date()).days
+    return (parse_when(at).date() - parse_when(pitched_at).date()).days
 
 
 def attenuation(og, sg_now):
