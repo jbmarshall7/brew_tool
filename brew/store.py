@@ -461,6 +461,14 @@ class Store:
         self.save_batch(batch)
         return batch
 
+    def write_report(self, name, text):
+        """Save a generated report under data/reports/, return its path."""
+        d = self.data / "reports"
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / name
+        path.write_text(text, encoding="utf-8")
+        return path
+
     def batches_for_recipe(self, slug):
         return [b for b in self.list_batches()
                 if (b.get("recipe") or {}).get("slug") == slug]

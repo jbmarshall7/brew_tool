@@ -414,11 +414,11 @@ not re-litigated every session.
 
 ### 6.2 The resulting order
 
-**Progress (2026-09-06):** items 1–5 are built and merged to `main` — the whole
-Near tier plus the two foundational Considered items (vessels, dispositions).
-Items 6–7 (the TTB operations report and the excise worksheets) are the heavy,
-licensed-operator remainder and are best taken as their own focused sessions,
-because they need Warblers' actual Connecticut filing cadence and rates as input.
+**Progress (2026-09-07):** items 1–5 and the TTB-report half of item 6 are
+built and merged to `main`. What remains: document-expiry surfacing (the light
+half of item 6) and item 7 (the excise worksheets). Item 7 is the heavy,
+licensed-operator remainder, best taken as its own focused session because it
+needs Warblers' actual Connecticut filing cadence and rates as input.
 
 Leverage-ordered given the answers, with dependencies respected. Still a menu —
 one at a time, used on a real batch before the next — but this is the sequence
@@ -439,11 +439,17 @@ absent a reason to depart from it.
    derived occupancy — free / occupied-by, no fabricated free-by date.
 5. **Dispositions, including samples** (was B2). ✓ **Shipped** (round 8). Where
    bottles and sample pours went, on-hand derived; the input to 6–7 below.
-6. **TTB Report of Wine Premises Operations** (was B4) and
-   **document-expiry surfacing** (the light half of C3). ← **next.** The licensed-operator
-   compliance layer, once dispositions feed it: the F 5120.17 lines derived from
-   batches and dispositions, and permit/COA/insurance renewal dates surfaced on
-   Today. A lapsed permit is a bad surprise the tool can prevent.
+6. **TTB Report of Wine Premises Operations** (was B4). ✓ **Shipped** (round 9).
+   The F 5120.17 lines derived from batches and dispositions for any period:
+   produced by fermentation, bottled, removals bucketed by tax class (samples
+   and breakage kept separate), losses (bulk-to-bottle + breakage), and the
+   period-end inventory computed **as of the period end, not "now"** so a past
+   month reads as it stood. Flags gaps (missing tax class, unpriced package)
+   and writes a markdown report to `data/reports/`. Makes no legal determination
+   and computes no tax.
+   - **document-expiry surfacing** (the light half of C3) ← **next.** Permit / COA /
+     insurance renewal dates surfaced on Today. A lapsed permit is a bad
+     surprise the tool can prevent. Small; the remaining half of this item.
 7. **Excise worksheets — federal + CT, with the CBMA credit** (was C2). The
    heaviest, last, once removals data exists and the sparkling tax class is
    modelled. Worksheets that state their derivations; rates are

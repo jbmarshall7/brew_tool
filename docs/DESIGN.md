@@ -6,6 +6,25 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-07 — the TTB operations report (round 9, roadmap B4).** A `/ttb`
+  page (and nav item) renders the Report of Wine Premises Operations (F 5120.17)
+  for any period: produced by fermentation (period pitches × volume), bottled
+  (packaging in the period), removals from dispositions bucketed by the
+  package's tax class — with `sample` its own bucket and `breakage` a loss, not
+  a removal — losses (bulk-to-bottle shortfall + breakage), and the period-end
+  inventory. The inventory is computed **as of the period end, not "now"**: bulk
+  is the volume from the last racking on or before the end date, bottled on-hand
+  is units made less what had left by the end date, so re-running August in
+  September still reads 17 bottles, not today's count. Every figure is derived
+  in `calc.ttb_report(batches, start, end)`; `calc.unit_gallons` reads gallons
+  from a free-text package name ("750 ml", "1.5 L", "12 oz"). The page flags
+  gaps it will not paper over — a bottling with no tax class, a package that
+  states no volume — and a POST writes the whole thing as markdown to
+  `data/reports/` (git-ignored: operator output, not source). The report
+  states, in the page and the file, that it makes no legal determination and
+  computes no tax; it supports the filing, it does not file. No new stored
+  fields — it reads the batch files item 8's dispositions already produce.
+
 - **2026-09-06 — priming-safety fix (adversarial review of rounds 4–6).** A
   background chemistry-review workflow caught a high-severity hole I shipped in
   round 5: `record_priming` refused a *stabilized* mead but never checked the
