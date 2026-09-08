@@ -6,3 +6,6 @@ __pycache__/
 
 # the handoff zip duplicates design_handoff_brew_tool_ui/ byte for byte
 *.zip
+
+# generated TTB / operations reports (operator output, not source)
+data/reports/

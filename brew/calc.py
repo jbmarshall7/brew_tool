@@ -651,6 +651,146 @@ def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
     }
 
 
+# --- the TTB operations report (F 5120.17) ----------------------------------
+# Aggregates a period from the same batches and dispositions everything else
+# reads. It SUPPORTS the filing and flags gaps; it makes no legal
+# determination and computes no tax (that is the excise worksheet's job).
+import re as _re
+GAL_PER_LITER = 0.264172
+_UNIT_RE = _re.compile(r"(\d+(?:\.\d+)?)\s*(ml|l|liter|litre|oz|gal)\b",
+                       _re.I)
+# a disposition that leaves the premises for consumption or sale is a taxable
+# removal; a sample is its own line the operator classifies; breakage is a loss
+TAXABLE_REMOVALS = ("sold", "taproom", "gift")
+
+
+def unit_gallons(unit_str):
+    """US gallons the package holds, from its name, or None if it says none."""
+    m = _UNIT_RE.search(unit_str or "")
+    if not m:
+        return None
+    qty, u = float(m.group(1)), m.group(2).lower()
+    if u == "ml":
+        return qty / 1000 * GAL_PER_LITER
+    if u in ("l", "liter", "litre"):
+        return qty * GAL_PER_LITER
+    if u == "oz":
+        return qty / 128.0
+    return qty
+
+
+def _within(at, start, end):
+    return bool(at) and start <= at[:10] <= end
+
+
+def ttb_report(batches, start, end):
+    """The period's operations lines. All gallons; every figure derived."""
+    production, bottled, removals, losses = [], [], {}, []
+    gaps = []
+    prod_gal = bott_gal = loss_gal = 0.0
+
+    for b in sorted(batches, key=lambda x: x.get("id") or ""):
+        bid = b.get("id")
+        r = (b.get("recipe") or {})
+        pk = b.get("packaging") or {}
+        unit_gal = unit_gallons(pk.get("unit")) if pk else None
+
+        # A — produced by fermentation: the tank was filled this period
+        if _within(b.get("pitched_at"), start, end):
+            g = round(b.get("volume_gal") or 0, 2)
+            prod_gal += g
+            production.append({"batch": bid, "recipe": r.get("name"),
+                               "started": (b["pitched_at"] or "")[:10], "gal": g})
+
+        # B — bottled this period
+        if pk and _within(pk.get("at"), start, end):
+            g = round(pk.get("volume_gal") or 0, 2)
+            bott_gal += g
+            tc = pk.get("tax_class") or "(unrecorded)"
+            if pk.get("tax_class") is None:
+                gaps.append(f"{bid}: bottled with no tax class on record")
+            bottled.append({"batch": bid, "units": pk.get("units"),
+                            "unit": pk.get("unit"), "gal": g, "tax_class": tc})
+            # C — losses: bulk that went in the tank but not into bottles
+            shortfall = round((b.get("volume_gal") or 0) - g, 2)
+            if shortfall > 0.05:
+                loss_gal += shortfall
+                losses.append({"batch": bid, "gal": shortfall,
+                               "date": (pk["at"] or "")[:10], "why": "bulk-to-bottle"})
+
+        # C — removals and breakage-losses from dispositions this period
+        for d in b.get("dispositions") or []:
+            if not _within(d.get("at"), start, end):
+                continue
+            g = round((d.get("qty") or 0) * (unit_gal or 0), 3)
+            if d["kind"] == "breakage":
+                loss_gal += g
+                losses.append({"batch": bid, "gal": g,
+                               "date": (d["at"] or "")[:10], "why": "breakage"})
+                continue
+            bucket = ("samples" if d["kind"] == "sample"
+                      else pk.get("tax_class") or "(unrecorded)"
+                      if d["kind"] in TAXABLE_REMOVALS else d["kind"])
+            row = removals.setdefault(bucket, {"gal": 0.0, "units": 0, "rows": []})
+            row["gal"] = round(row["gal"] + g, 3)
+            row["units"] += d.get("qty") or 0
+            row["rows"].append({"batch": bid, "date": (d["at"] or "")[:10],
+                                "kind": d["kind"], "units": d.get("qty"),
+                                "gal": g, "to": d.get("to")})
+            if d["kind"] in TAXABLE_REMOVALS and pk.get("tax_class") is None:
+                gaps.append(f"{bid}: taxable removal with no tax class on record")
+            if unit_gal is None and pk:
+                gaps.append(f"{bid}: package '{pk.get('unit')}' states no "
+                            "volume, so removal gallons can't be computed")
+
+    # E — period-end inventory (what was on hand as of `end`, not now)
+    bulk_inv, bottled_inv = [], []
+    bulk_gal = bottled_inv_gal = 0.0
+    for b in sorted(batches, key=lambda x: x.get("id") or ""):
+        pk = b.get("packaging") or {}
+        pitched = (b.get("pitched_at") or "")[:10]
+        if not pitched or pitched > end:
+            continue
+        if not pk or (pk.get("at") or "")[:10] > end:
+            # still in bulk at period end: the volume as of `end` — the last
+            # racking on or before it, else the volume the must was made to
+            g = b.get("volume_gal") or 0
+            for rk in sorted(b.get("rackings") or [], key=lambda r: r.get("at") or ""):
+                if (rk.get("at") or "")[:10] <= end and rk.get("volume_gal") is not None:
+                    g = rk["volume_gal"]
+            g = round(g, 2)
+            if g > 0:
+                bulk_gal += g
+                bulk_inv.append({"batch": b["id"], "gal": g,
+                                 "tag": next_action(b).get("tag")})
+        else:
+            # bottled by `end`: units made less what had left by `end`
+            out = sum(d.get("qty", 0) for d in b.get("dispositions") or []
+                      if (d.get("at") or "")[:10] <= end)
+            oh = (pk.get("units") or 0) - out
+            ug = unit_gallons(pk.get("unit")) or 0
+            g = round(oh * ug, 2)
+            if oh > 0:
+                bottled_inv_gal += g
+                bottled_inv.append({"batch": b["id"], "units": oh,
+                                    "unit": pk.get("unit"), "gal": g,
+                                    "tax_class": pk.get("tax_class") or "(unrecorded)"})
+
+    taxable_gal = round(sum(v["gal"] for k, v in removals.items()
+                            if k not in ("samples", "gift")), 2)
+    return {
+        "start": start, "end": end,
+        "production": production, "production_gal": round(prod_gal, 2),
+        "bottled": bottled, "bottled_gal": round(bott_gal, 2),
+        "removals": removals, "taxable_removals_gal": taxable_gal,
+        "losses": losses, "losses_gal": round(loss_gal, 2),
+        "bulk_inventory": bulk_inv, "bulk_inventory_gal": round(bulk_gal, 2),
+        "bottled_inventory": bottled_inv,
+        "bottled_inventory_gal": round(bottled_inv_gal, 2),
+        "gaps": sorted(set(gaps)),
+    }
+
+
 # --- ids --------------------------------------------------------------------
 def next_batch_id(existing_ids, year):
     """B-YYYY-NNN: one past the highest number already used this year."""
