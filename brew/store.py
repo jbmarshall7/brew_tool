@@ -461,6 +461,57 @@ class Store:
         self.save_batch(batch)
         return batch
 
+    # --- compliance documents: a flat list, status derived on render ------
+    def documents_path(self):
+        return self.data / "documents.json"
+
+    def list_documents(self):
+        path = self.documents_path()
+        if not path.exists():
+            return []
+        doc = self.read_json(path)
+        return doc.get("documents", []) if isinstance(doc, dict) else []
+
+    def add_document(self, label, expires, kind="", ref="", note=""):
+        """Add a permit / licence / COA / policy with the date it lapses.
+
+        Only the expiry date is required — days-left and status are derived.
+        """
+        from . import calc
+        label = (label or "").strip()
+        if not label:
+            raise ValueError("give the document a name — 'TTB Basic Permit', "
+                             "'CT Farm Winery Permit', 'Liability insurance'")
+        expires = calc.parse_date(expires).isoformat()   # validate the date
+        docs = self.list_documents()
+        did = f"D-{max([int(x['id'].split('-')[1]) for x in docs if x.get('id', '').startswith('D-') and x['id'].split('-')[1].isdigit()], default=0) + 1:03d}"
+        d = {"id": did, "label": label, "expires": expires}
+        if (kind or "").strip():
+            d["kind"] = kind.strip()
+        if (ref or "").strip():
+            d["ref"] = ref.strip()
+        if (note or "").strip():
+            d["note"] = note.strip()
+        docs.append(d)
+        self.write_json(self.documents_path(), {"documents": docs})
+        return d
+
+    def renew_document(self, doc_id, expires):
+        """Move a document's expiry forward — the recurring real event.
+
+        A renewal replaces the date in place: the current expiry is the fact
+        that matters, and git keeps the history of what it was before.
+        """
+        from . import calc
+        expires = calc.parse_date(expires).isoformat()
+        docs = self.list_documents()
+        for d in docs:
+            if d.get("id") == doc_id:
+                d["expires"] = expires
+                self.write_json(self.documents_path(), {"documents": docs})
+                return d
+        raise ValueError(f"there's no document {doc_id}")
+
     def write_report(self, name, text):
         """Save a generated report under data/reports/, return its path."""
         d = self.data / "reports"
