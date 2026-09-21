@@ -4,6 +4,11 @@ GET / with the targets in the query string. The first load is already an
 answer (6 gal at 12 %); the owner changes what differs and reads the sheet.
 The whole page is one form: Recompute is a GET back here, Save is the same
 fields POSTed to /recipes — so a recompute never drops the name or notes.
+That also means the save card's required fields (the name, and on a
+redesign what changed) sit in the form Recompute submits, so Recompute is
+`formnovalidate`: otherwise an empty name blocks every recompute, and so
+does Enter — or Go on a phone keyboard — because implicit submission goes
+through this, the form's first button. Only Save should demand them.
 """
 from . import calc
 from .html import (details, esc, field, hidden, next_link, num,
@@ -108,7 +113,7 @@ def targets_card(inp, p=None, store=None):
              "Most wine strains are medium. Check the strain's sheet.")}
 {field("additions", "Fermaid O feedings", inp["additions"], "TOSNA is 4: 24 h, 48 h, 72 h, then by the 1/3 break.", step="1")}
 {more}
-<button>Recompute</button>
+<button formnovalidate>Recompute</button>
 </div>"""
 
 
