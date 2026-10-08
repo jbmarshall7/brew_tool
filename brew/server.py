@@ -7,6 +7,7 @@ a traceback), and hand anything else to a 500 that logs and says little.
 """
 import re
 import sys
+import threading
 import traceback
 from collections import namedtuple
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -66,7 +67,23 @@ def page(title, body, req, active="/"):
                               req.params.get("kind", "ok")))
 
 
+# Every write is a read-modify-write of a whole JSON file, and the server
+# answers requests on threads — so two writes at once could each read the old
+# file and the second save would erase the first (20 simultaneous readings
+# used to leave 1). One lock around every POST makes writes take turns; a
+# one-owner cellar never notices the queue. Reads stay concurrent.
+_WRITES = threading.Lock()
+
+
 def dispatch(req):
+    if req.method == "POST":
+        with _WRITES:
+            return _dispatch(req)
+    return _dispatch(req)
+
+
+def _dispatch(req):
+    from .store import AlreadyRecorded
     for method, pat, view in ROUTES:
         if method != req.method:
             continue
@@ -74,6 +91,11 @@ def dispatch(req):
         if m:
             try:
                 return view(req._replace(args=m.groups()))
+            except AlreadyRecorded as e:
+                # the same form twice (a double tap, Back and resubmit): the
+                # first one counted, this one writes nothing
+                return redirect(e.where, "Already recorded — that form was "
+                                "sent twice, so nothing was added.", "ok")
             except ValueError as e:
                 # a number the owner typed that the math refused — say so,
                 # on a page, with the banner; never a traceback

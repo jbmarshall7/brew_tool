@@ -414,6 +414,8 @@ not re-litigated every session.
 
 ### 6.2 The resulting order
 
+**Hardening (2026-10-08):** a full evaluation found the app had never run a real batch and would let dangerous paths through. Before anything new: round 11 makes it refuse (bottling/priming rules, closed records, dating, once-only forms, a write lock, sulfite limits, data out of the public repo); round 12 makes the TTB books balance; then the real cellar goes in; then round 13 fits it to eight batches. Item 7 waits on all of that.
+
 **Progress (2026-09-11):** items 1–6 are built and merged to `main` — the whole
 Near tier, vessels, dispositions, the TTB operations report and the
 document-expiry surfacing. Only item 7 remains: the excise worksheets. It is the

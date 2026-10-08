@@ -397,6 +397,15 @@ def kv(rows):
     return "".join(out)
 
 
+def once():
+    """A one-time token for a form that records something. Fresh on every
+    page render, so a second real entry is never blocked — but if the SAME
+    form arrives twice (a double tap, Back and resubmit) the store sees the
+    token again and writes nothing."""
+    import uuid
+    return hidden("once", uuid.uuid4().hex)
+
+
 def pill(text, kind=""):
     return raw(f'<span class="pill {esc(kind)}">{esc(text)}</span>')
 

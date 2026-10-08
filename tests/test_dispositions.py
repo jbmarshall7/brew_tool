@@ -31,7 +31,10 @@ class DispositionTest(unittest.TestCase):
         dispatch(Request("POST", "/recipes", {}, OWNER, (), self.store))
         dispatch(Request("POST", "/recipes/ob/must", {}, RECORD, (),
                          self.store))
+        # finished: dry and flat for days — the only state bottling allows
+        # without stabilizing (see test_guardrails for the refusals)
         self.store.add_reading("B-2026-003", "1.000", at="2026-08-28T09:00")
+        self.store.add_reading("B-2026-003", "1.000", at="2026-08-31T09:00")
 
     def bottle(self, n=28):
         self.store.record_bottling("B-2026-003", str(n), "750 mL bottle")

@@ -208,6 +208,43 @@ def sorbate_grams(gallons, ph, abv_now):
     return {"g": g, "rate": rate, "ppm": ppm, "stepped_up": high}
 
 
+# The dose for 0.8 ppm molecular climbs steeply with pH (pH 3.4 needs ~32 ppm
+# free, 3.8 ~79, 4.0 ~125, 4.5 ~393). Past these lines the right move is to
+# bring the pH down, not to pour in more sulfite.
+SO2_HIGH_PH = 3.8           # above this: warn, and suggest acidifying first
+SO2_FREE_CEILING = 100      # ppm free in one dose: past this, a recorded reason
+SO2_LEGAL_TOTAL = 350       # ppm total SO2 in wine, 27 CFR 4.22(b)(1): never
+
+
+def sulfite_problem(free_ppm, ph):
+    """('refuse' | 'reason' | 'warn', text) about a free-SO2 dose, or None.
+
+    'refuse' — the dose alone passes the legal limit for total SO2; no reason
+    makes that sellable. 'reason' — past the practical ceiling; it can be
+    done, but only on the record. 'warn' — high pH; it works, but sharply.
+    """
+    fix = ("Bring the pH down first (tartaric or acid blend, then re-measure) "
+           "— every 0.1 lower cuts the dose by about a fifth.")
+    if free_ppm > SO2_LEGAL_TOTAL:
+        return ("refuse",
+                f"At pH {_g2(ph)} that is {_g1(free_ppm)} ppm free SO₂ — over "
+                f"the {SO2_LEGAL_TOTAL} ppm legal limit for total SO₂ before "
+                f"any of it binds. {fix}")
+    if free_ppm > SO2_FREE_CEILING:
+        return ("reason",
+                f"At pH {_g2(ph)} that is {_g1(free_ppm)} ppm free SO₂ — far "
+                f"past what you can taste (~50) and much of it will bind. {fix}")
+    if ph > SO2_HIGH_PH:
+        return ("warn",
+                f"pH {_g2(ph)} is high for mead: {_g1(free_ppm)} ppm free SO₂ "
+                f"is a lot to taste. {fix}")
+    return None
+
+
+def _g2(x):
+    return f"{round(float(x), 2):g}"
+
+
 def stabilize_doses(gallons, ph, abv_now, molecular=MOLECULAR_SO2_TARGET):
     """Both stabilizer doses at once — they are given together or not at all."""
     free, frac = molecular_so2_free_needed(ph, molecular)
@@ -982,6 +1019,101 @@ def is_bottled(batch):
 
 def is_primed(batch):
     return bool(batch.get("primings"))
+
+
+# --- the two operations that can burst glass --------------------------------
+# Priming and bottling are where a cellar mistake becomes a safety problem, so
+# each has ONE rule, here, that the store enforces and the form explains. The
+# store refuses whatever these return unless a reason is recorded with it.
+
+# CO2 one gravity point of sugar makes if it ferments in a sealed bottle:
+# 1 pt/gal = 1/46 lb sugar = 2.6 g/L, x 0.51 g CO2 per g sugar, / 1.969 g/L
+# per volume = ~0.67 volumes. Ten points left behind is ~7 extra volumes.
+VOLS_PER_POINT = (453.592 / SUGAR_PPG / 3.78541
+                  * SUGAR_YIELD["table sugar"] / CO2_G_PER_VOL_PER_L)
+
+
+def last_read_sg(batch):
+    """The last gravity actually READ — not a back-sweetened target. What the
+    yeast has finished is a measurement, never an intention."""
+    rows = [r for r in batch.get("readings") or [] if r.get("sg") is not None]
+    if not rows:
+        return None
+    return max(rows, key=lambda r: r.get("at") or "")["sg"]
+
+
+def is_dry(batch):
+    """No sugar left for yeast to find: the last reading is at or under 1.000
+    (or the batch's own lower finish), within FINISHED_MARGIN. A sweet target
+    FG does not make residual sugar safe to seal in with live yeast."""
+    g = last_read_sg(batch)
+    fg = (batch.get("target") or {}).get("fg") or 1.0
+    return g is not None and g <= min(fg, 1.0) + FINISHED_MARGIN + 1e-9
+
+
+def _sugar_left(batch):
+    """(points above the dry floor, extra volumes of CO2 they would make)."""
+    g = last_read_sg(batch)
+    if g is None:
+        return 0.0, 0.0
+    floor = min((batch.get("target") or {}).get("fg") or 1.0, 1.0)
+    pts = max(0.0, (g - floor) * 1000)
+    return round(pts, 1), round(pts * VOLS_PER_POINT, 1)
+
+
+def priming_refusal(batch):
+    """Why priming this batch now would be dangerous, or None if it is safe.
+
+    Priming is only safe on a mead that is finished, dry, and has had no sugar
+    put back: live yeast eats every gram left in the bottle, priming or not.
+    """
+    if is_primed(batch):
+        return ("It is already primed — a second dose of sugar doubles the "
+                "pressure in every bottle.")
+    if is_stabilized(batch):
+        return ("This mead is stabilized — the yeast is inhibited and cannot "
+                "carbonate. Bottle-conditioning needs live yeast.")
+    if is_sweetened(batch):
+        return ("It has been back-sweetened — that sugar would ferment in the "
+                "bottle on top of the priming. Bottle-condition a dry mead and "
+                "sweeten it another way.")
+    if not is_stable(batch):
+        return (f"It hasn't held a steady gravity for {STABLE_DAYS} days — "
+                "priming a mead that is still fermenting adds sugar on top of "
+                "the sugar it hasn't finished, and the bottles can burst.")
+    if not is_dry(batch):
+        pts, vols = _sugar_left(batch)
+        return (f"It is steady at {sg_text(last_read_sg(batch))}, but not dry — "
+                f"if the yeast finishes those {_g1(pts)} points in the bottle "
+                f"that is about {_g1(vols)} more volumes on top of the priming. "
+                "Only prime a mead that has finished dry.")
+    return None
+
+
+def bottling_refusal(batch):
+    """Why sealing this batch in glass now would be dangerous, or None.
+
+    Safe to bottle: primed on purpose (priming has its own rule), or
+    stabilized, or finished dry with nothing sweetened back in.
+    """
+    if is_primed(batch):
+        return None
+    if is_sweetened(batch) and not is_stabilized(batch):
+        return ("It was back-sweetened without being stabilized — that sugar "
+                "can restart in the bottle and burst it. Stabilize first.")
+    if is_stabilized(batch):
+        return None
+    if not is_stable(batch):
+        return (f"It hasn't held a steady gravity for {STABLE_DAYS} days — a "
+                "mead still fermenting in the bottle builds pressure until the "
+                "glass gives. Log a couple of flat readings first.")
+    if not is_dry(batch):
+        pts, vols = _sugar_left(batch)
+        return (f"It is steady at {sg_text(last_read_sg(batch))} with nothing "
+                "to stop the yeast — if it wakes up in the bottle, those "
+                f"{_g1(pts)} points are about {_g1(vols)} volumes of pressure. "
+                "Stabilize it first.")
+    return None
 
 
 # where bottled mead goes — light channels, not the full TTB removal taxonomy

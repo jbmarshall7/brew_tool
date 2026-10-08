@@ -112,8 +112,11 @@ class PrimingRecordTest(SparklingTestCase):
         body = dispatch(Request("GET", "/batches/B-2026-003",
                                 {"prime_vols": "2.5", "prime_temp": "68"}, {},
                                 ("B-2026-003",), self.store)).body
-        self.assertIn("over-carbonates and bursts bottles", body)
-        self.assertIn("It is not steady yet", body)     # the override affordance
+        # the warning is calc.priming_refusal's own sentence, so the form and
+        # the store can never disagree about why
+        self.assertIn("still fermenting", body)
+        self.assertIn("the bottles can burst", body)
+        self.assertIn("Prime it anyway", body)          # the override affordance
 
     def test_a_stabilized_mead_cannot_be_primed(self):
         self.store.record_stabilize("B-2026-003", "3.4")

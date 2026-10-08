@@ -6,7 +6,7 @@ bottled yet, free once it is. Nothing here is a status kept by hand.
 from datetime import datetime
 
 from . import calc
-from .html import (banner, details, esc, field, num, page as _page, pill, raw,
+from .html import (banner, details, esc, field, num, once, page as _page, pill, raw,
                    sg, table)
 from .server import Response, redirect, route
 
@@ -38,7 +38,7 @@ def vessels(req):
         rows.append([raw(f'<b>{esc(v.get("name"))}</b>'), cap, state, holds])
     body = table(["Vessel", "Capacity", "State", "Holding"], rows,
                  empty="No vessels yet — add your carboys and tanks below.")
-    add = f'''<form class="inline" method="post" action="/vessels/add">
+    add = f'''<form class="inline" method="post" action="/vessels/add">{once()}
 <div class="grid">
 <span>{field("name", "Name", "", "Carboy 1, Fermenter 2, the 15-gal tank…", typ="text", required=True)}</span>
 <span>{field("gal", "Capacity (gal)", "", "Optional.")}</span>
@@ -54,7 +54,8 @@ def vessels(req):
 @route("POST", "/vessels/add")
 def vessels_add(req):
     try:
-        v = req.store.add_vessel(req.form.get("name"), req.form.get("gal"))
+        v = req.store.add_vessel(req.form.get("name"), req.form.get("gal"),
+                                  once=req.form.get("once"))
     except ValueError as e:
         return redirect("/vessels", str(e), "err")
     return redirect("/vessels", f"Added {v['name']}.", "ok")

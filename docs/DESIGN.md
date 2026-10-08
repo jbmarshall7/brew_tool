@@ -6,6 +6,42 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-10-08 — it refuses the dangerous thing (round 11, from the
+  evaluation).** An audit found the guardrails were written per designed path,
+  so the paths nobody designed were open: a batch the app itself called "still
+  moving" bottled without a word, and a ferment stuck at 1.030 primed — twice.
+  Now each operation that can burst glass has ONE rule in calc that the store
+  enforces and the form explains, so they cannot disagree:
+  `bottling_refusal` (safe only if primed, stabilized, or dry-and-steady with
+  nothing sweetened back) and `priming_refusal` (refused if already primed,
+  stabilized, sweetened, unsteady, or not dry). "Dry" (`is_dry`) is measured
+  against min(target FG, 1.000): a sweet target does not make sugar safe to
+  seal in with live yeast, and the refusal says how much pressure the leftover
+  sugar would make (`VOLS_PER_POINT` ≈ 0.67). Every refusal still yields to a
+  recorded reason, kept on the event. Around them:
+  - **A bottled batch's record is closed** — no readings, feeds, rackings,
+    doses or flavor additions; tastings and dispositions are still welcome.
+    The batch page and Today stop offering what the store would refuse.
+  - **Events are dated sanely** — never before the pitch, never in the future
+    (12 h slack for a phone's clock), no disposition before the bottling, and
+    no pitch in 2062.
+  - **A form that arrives twice writes once.** Every recording form carries a
+    fresh one-time token (`html.once()`); the store raises `AlreadyRecorded` on
+    a repeat and the server answers "Already recorded". A double-tapped sale
+    used to count twice, and taxable removals with it.
+  - **Writes take turns.** One lock around every POST: 20 simultaneous readings
+    used to leave 1 on file; now all 20 land. Reads stay concurrent.
+  - **Sulfite has limits** (`sulfite_problem`): warn above pH 3.8, a recorded
+    reason past 100 ppm free, and refused outright past the 350 ppm legal limit
+    for total SO₂ (27 CFR 4.22) — each time suggesting acid, which cuts the dose
+    about a fifth per 0.1 pH.
+  - **`data/` is no longer committed.** The repository is public; the cellar's
+    records (production, sales, permit numbers) are not source. "Git is the
+    history" no longer applies to data — the README says to back the folder up
+    instead (or point `BREW_DATA` at one that is).
+  - The Bottle step's 12 oz estimate divided by 5.25 oz; it now uses
+    `unit_gallons`, so 5.7 gal reads 60 bottles, not 139.
+
 - **2026-09-11 — document-expiry surfacing (round 10, roadmap C3 light half).**
   A `/documents` page (nav "Docs") holds the compliance documents — TTB and
   state permits, COAs, insurance, the bond — and the single fact the app cannot

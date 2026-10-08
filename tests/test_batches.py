@@ -128,8 +128,8 @@ class RecordTest(BatchTestCase):
             self.assertEqual(r.location.split("?")[0], f"/batches/{want}",
                              typed)
         # the year comes from the pitch date, not the clock
-        r = self.post(MUST, dict(RECORD, id="9", pitched_at="2027-01-05T09:00"))
-        self.assertTrue(r.location.startswith("/batches/B-2027-009?"))
+        r = self.post(MUST, dict(RECORD, id="9", pitched_at="2025-01-05T09:00"))
+        self.assertTrue(r.location.startswith("/batches/B-2025-009?"))
 
     def test_without_a_check_the_og_is_still_required(self):
         r = self.post(MUST, dict(RECORD, og="", reading="", temp_f=""))

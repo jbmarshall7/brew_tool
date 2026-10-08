@@ -168,7 +168,7 @@ class FlavorTestCase(unittest.TestCase):
     def test_fruit_is_not_watched_for_over_extraction(self):
         now = datetime(2026, 9, 6, 10, 0)
         self.store.record_flavor("B-2026-003", "fruit", "cherries",
-                                 at="2026-07-01T09:00")   # long ago
+                                 at="2026-08-11T09:00")   # weeks of contact
         self.assertEqual(
             calc.flavors_in_contact(self.store.load_batch("B-2026-003"), now),
             [])

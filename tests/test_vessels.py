@@ -64,6 +64,7 @@ class VesselTest(unittest.TestCase):
         self.assertTrue(by_name["Carboy 2"]["free"])
         # bottle it → the vessel frees
         self.store.add_reading("B-2026-003", "1.000", at="2026-08-28T09:00")
+        self.store.add_reading("B-2026-003", "1.000", at="2026-08-31T09:00")
         self.store.record_bottling("B-2026-003", "28", "750 mL bottle")
         occ = calc.vessel_occupancy(self.store.list_vessels(),
                                     self.store.list_batches())
