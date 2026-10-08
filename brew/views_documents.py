@@ -6,7 +6,7 @@ bad surprise this page (and Today) exist to prevent.
 from datetime import date
 
 from . import calc
-from .html import (banner, details, esc, field, page as _page, pill, raw,
+from .html import (banner, details, esc, field, once, page as _page, pill, raw,
                    table)
 from .server import Response, redirect, route
 
@@ -57,7 +57,7 @@ def documents(req):
     kinds = "".join(f'<option value="{esc(k)}">' for k in
                     ("TTB Basic Permit", "State permit", "COA", "Insurance",
                      "Bond", "Licence"))
-    add = f'''<form class="inline" method="post" action="/documents/add">
+    add = f'''<form class="inline" method="post" action="/documents/add">{once()}
 <div class="grid">
 <span>{field("label", "Document", "", "TTB Basic Permit, CT Farm Winery Permit, Liability insurance…", typ="text", required=True)}</span>
 <span>{field("expires", "Expires", "", "When it lapses.", typ="date", required=True)}</span>
@@ -83,7 +83,7 @@ def documents_add(req):
     try:
         d = req.store.add_document(f.get("label"), f.get("expires"),
                                    f.get("kind", ""), f.get("ref", ""),
-                                   f.get("note", ""))
+                                   f.get("note", ""), once=f.get("once"))
     except ValueError as e:
         return redirect("/documents", str(e), "err")
     return redirect("/documents", f"Added {d['label']}, expires {d['expires']}.",

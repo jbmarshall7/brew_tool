@@ -9,8 +9,8 @@ from datetime import datetime
 
 from . import calc
 from .chart import sparkline
-from .html import (banner, esc, field, hidden, next_link, num, page as _page,
-                   pill, raw, sg, table)
+from .html import (banner, esc, field, hidden, next_link, num, once,
+                   page as _page, pill, raw, sg, table)
 from .server import Response, route
 from .sheet import product_name
 
@@ -56,7 +56,7 @@ def row_log(batch_id):
     box = field("reading", "", "", None, step="0.001", required=True,
                 attrs='placeholder="1.0__"', id_=f"sg-{batch_id}")
     return (f'<form class="mini noprint" method="post" '
-            f'action="/batches/{esc(batch_id)}/reading">{box}'
+            f'action="/batches/{esc(batch_id)}/reading">{once()}{box}'
             "<button>Log</button></form>")
 
 
@@ -75,7 +75,8 @@ def cellar_rows(pairs, now):
             raw(sparkline(b)),
             raw(f'{pill(act["tag"], act["kind"])}'
                 f'<span class="sub">{esc(act["text"])}</span>'),
-            raw(row_log(b["id"])),
+            # a bottled batch takes no more readings (the store refuses them)
+            raw("" if calc.is_bottled(b) else row_log(b["id"])),
         ])
     return rows
 

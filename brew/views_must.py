@@ -13,8 +13,9 @@ from urllib.parse import urlencode
 
 from . import calc
 from .html import (banner, card, details, esc, field, gal_l, hidden, kv,
-                   lb_oz, num, page as _page, pill, sg, textarea)
+                   lb_oz, num, once, page as _page, pill, sg, textarea)
 from .server import Response, redirect, route
+from .store import FUTURE_SLACK, AlreadyRecorded
 from .sheet import feed_when, product_name
 from .views_recipes import plan_for
 
@@ -186,7 +187,7 @@ def record_form(slug, p, params, og, next_id, gal_now, now=None):
     keep = "".join(hidden(k, params.get(k, ""))
                    for k in ("reading", "temp_f", "cal_f", "now_gal"))
     return f"""<form class="inline" method="post" action="/recipes/{esc(slug)}/must" id="record-form">
-{keep}{hidden("gal", num(p["gal"]))}
+{once()}{keep}{hidden("gal", num(p["gal"]))}
 <div class="grid">
 <span>{field("id", "Batch id", g("id", next_id), "The next number; type your own (even just 003) to continue a numbering from elsewhere.", typ="text", required=True, id_="rec-id")}</span>
 <span>{field("pitched_at", "Yeast pitched at", g("pitched_at", now), "The feeding clock starts here.", typ="datetime-local", step=None, required=True, id_="rec-pitched")}</span>
@@ -303,8 +304,14 @@ def record(req):
                        1000)
         p = plan_for(r, gal)
         pitched = calc.parse_when(f.get("pitched_at"))
+        if pitched > datetime.now() + FUTURE_SLACK:
+            raise ValueError(f"{calc.fmt_when(pitched).replace('T', ' ')} is "
+                             "in the future — check the pitch date")
         batch_id = normalize_id(f.get("id"), pitched.year)
         store.batch_path(batch_id)
+        if f.get("once") and store.batch_exists(batch_id) \
+                and store.load_batch(batch_id).get("once") == f.get("once"):
+            raise AlreadyRecorded(f"/batches/{batch_id}")   # a double tap
         if store.batch_exists(batch_id):
             nxt = calc.next_batch_id(store.batch_ids(), pitched.year)
             return bounce(f"{batch_id} is already recorded, so this must is "
@@ -349,6 +356,8 @@ def record(req):
         "nutrients": nutrients,
         "notes": (f.get("notes") or "").strip(),
     }
+    if f.get("once"):
+        batch["once"] = f.get("once")
     store.save_batch(batch)
     first = nutrients["additions"][0]
     from .views_batches import when

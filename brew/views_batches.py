@@ -9,7 +9,7 @@ from datetime import datetime
 
 from . import calc
 from .html import (banner, card, details, esc, field, hidden, kv,
-                   next_link, num,
+                   next_link, num, once,
                    page as _page, pill, raw, sg, table, textarea)
 from .server import Response, redirect, route
 from .chart import curve
@@ -56,13 +56,13 @@ def feed_table(b, now=None):
             action = raw(f'<span class="sub">{esc(when(done["at"]))}'
                          + (f' · {esc(done["note"])}' if done.get("note")
                             else "") + "</span>")
-        elif shut:
+        elif shut or calc.is_bottled(b):
             action = ""
         else:
             action = raw(
                 f'<form class="mini noprint" method="post" '
                 f'action="/batches/{esc(b["id"])}/feed">'
-                f'{hidden("n", str(num_))}'
+                f'{hidden("n", str(num_))}{once()}'
                 f'<button class="quiet">I gave this</button></form>')
         rows.append([f"#{num_}", f"{num(a.get('g'), 1)} g {pname}",
                      when(a.get("due")), raw(str(pill(state, kind))),
@@ -119,7 +119,7 @@ def log_form(batch_id, params=None):
                         None, attrs='placeholder="68"', id_="log-temp")),
         ))
     return (f'<form class="inline" id="log" method="post" '
-            f'action="/batches/{esc(batch_id)}/reading">'
+            f'action="/batches/{esc(batch_id)}/reading">{once()}'
             f'<div class="panel"><div class="row">{row}'
             f'<span style="flex:1;min-width:180px">'
             f'{field("note", "Note (optional)", params.get("note", ""), None, typ="text", id_="log-note")}</span>'
@@ -149,7 +149,7 @@ def dispositions_section(b):
             f'<span><span class="l">Out</span>'
             f'<span class="n">{calc.units_disposed(b)}</span></span></div>')
     opts = "".join(f"<option>{esc(k)}</option>" for k in calc.DISPO_KINDS)
-    form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/disposition">
+    form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/disposition">{once()}
 <div class="grid">
 <span><label for="d-kind">Where</label><select id="d-kind" name="kind">{opts}</select></span>
 <span>{field("qty", "How many", "", "Bottles leaving.", step="1", required=True, id_="d-qty")}</span>
@@ -177,7 +177,7 @@ def tasting_section(b):
                 empty="No tastings yet — the recipe improves fastest when you "
                       "write down what it tastes like.")
     opts = "".join(f"<option>{esc(st)}</option>" for st in calc.TASTING_STAGES)
-    form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/tasting">
+    form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/tasting">{once()}
 <div class="grid">
 <span><label for="ts-stage">Stage</label><select id="ts-stage" name="stage">{opts}</select></span>
 <span>{field("overall", "Overall (1–5)", "", "Optional gut score.", step="1", id_="ts-score")}</span>
@@ -215,7 +215,7 @@ def flavor_section(b):
                      contact, pull or (fl.get("note") or "")])
     table_html = table(["When", "Kind", "Item", "Qty", "Contact", ""], rows,
                        empty="No fruit, spice or oak recorded.")
-    form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/flavor">
+    form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/flavor">{once()}
 <div class="grid">
 <span><label for="fl-kind">Kind</label><select id="fl-kind" name="kind">
 <option>fruit</option><option>spice</option><option>oak</option><option>other</option></select></span>
@@ -233,6 +233,9 @@ def flavor_section(b):
                           "days — taste it; over-extraction doesn't come out.",
                           "warn" if longest["days"] >= calc.OAK_WATCH_DAYS
                           else "ok")
+    if calc.is_bottled(b):          # the cellar record is closed
+        return (f'<h2>Fruit, spice &amp; oak</h2>{table_html}'
+                if fls else "")
     return (f'<h2>Fruit, spice &amp; oak</h2>{lead}{table_html}'
             + details("Record fruit, spice or oak", f'<div class="inner">{form}</div>',
                       open_=not fls))
@@ -258,6 +261,7 @@ def finishing_card(b, params):
     now_sg = calc.current_sg(b)
     vol = calc.current_volume(b)
     steps = []
+    closed = calc.is_bottled(b)     # bottled: show the record, offer nothing
 
     # 1 — rack
     if calc.is_racked(b):
@@ -266,12 +270,13 @@ def finishing_card(b, params):
         summary = kv([("Racked", f"{num(last['volume_gal'])} gal in the vessel",
                        f"{when(last['at'])}{note}")])
         again = details("Racked again", f"""<div class="inner">
-<form class="inline" method="post" action="/batches/{esc(bid)}/rack">
+<form class="inline" method="post" action="/batches/{esc(bid)}/rack">{once()}
 {field("volume_gal", "Volume now (gal)", num(vol), "Measured after racking.")}
 {field("note", "Note", "", None, typ="text")}<button class="quiet">Record another racking</button></form></div>""")
-        steps.append(_fin_step("Rack off the lees", summary + again, ""))
-    else:
-        form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/rack">
+        steps.append(_fin_step("Rack off the lees",
+                               summary + ("" if closed else again), ""))
+    elif not closed:
+        form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/rack">{once()}
 <p class="mut">Rack once it falls clear. Record the volume actually in the
 vessel — every dose below is per that gallon.</p>
 {field("volume_gal", "Volume now (gal)", num(vol), "A little less than the batch — racking leaves the lees behind.")}
@@ -289,7 +294,7 @@ vessel — every dose below is per that gallon.</p>
                        + (f" · override: {st['override']}"
                           if st.get("override") else ""))])
         steps.append(_fin_step("Stabilize", summary, ""))
-    else:
+    elif not closed:
         stab = _stabilize_action(b, params, vol, og, now_sg)
         steps.append(_fin_step("Stabilize", "", stab))
 
@@ -303,7 +308,7 @@ vessel — every dose below is per that gallon.</p>
                        + (f" · override: {pr['override']}"
                           if pr.get("override") else ""))])
         steps.append(_fin_step("Carbonate (sparkling)", summary, ""))
-    elif not calc.is_stabilized(b):
+    elif not calc.is_stabilized(b) and not closed:
         steps.append(_fin_step("Carbonate (sparkling)", "",
                                _prime_action(b, params, vol)))
 
@@ -316,7 +321,7 @@ vessel — every dose below is per that gallon.</p>
                        + (f" · override: {sw['override']}"
                           if sw.get("override") else ""))])
         steps.append(_fin_step("Back-sweeten (optional)", summary, ""))
-    else:
+    elif not closed:
         sweet = _sweeten_action(b, params, vol, now_sg)
         steps.append(_fin_step("Back-sweeten (optional)", "", sweet))
 
@@ -324,16 +329,29 @@ vessel — every dose below is per that gallon.</p>
     if calc.is_bottled(b):
         pk = b["packaging"]
         summary = kv([("Bottled", f"{pk['units']} × {pk['unit']}",
-                       f"{when(pk['at'])} · {num(pk.get('volume_gal'))} gal")])
+                       f"{when(pk['at'])} · {num(pk.get('volume_gal'))} gal"
+                       + (f" · override: {pk['override']}"
+                          if pk.get("override") else ""))])
         steps.append(_fin_step("Bottle", summary, ""))
     else:
-        form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/bottle">
+        refusal = calc.bottling_refusal(b)
+        warn = (banner(refusal + " Recording it will ask for a reason.", "warn")
+                if refusal else "")
+        override = (details(
+            "Bottle it anyway — I know why it is safe",
+            '<div class="inner">' + field(
+                "override", "Reason (recorded with the bottling)", "",
+                "e.g. kegged and kept cold; pasteurized after bottling.",
+                typ="text", id_="bottle-override") + "</div>")
+            if refusal else "")
+        form = f"""{warn}<form class="inline" method="post" action="/batches/{esc(bid)}/bottle">{once()}
 <p class="mut">The last step. {num(vol)} gal is about
-{int((vol or 0) / 0.198)} × 750 mL, or {int((vol or 0) / 0.041)} × 12 oz.</p>
+{int((vol or 0) / calc.unit_gallons("750 ml"))} × 750 mL, or
+{int((vol or 0) / calc.unit_gallons("12 oz"))} × 12 oz.</p>
 <div class="grid">
 <span>{field("units", "How many", "", "The count you actually filled.", step="1")}</span>
 <span>{field("unit", "Package", "750 mL bottle", "Bottle, keg, whatever it went in.", typ="text")}</span>
-</div>{field("note", "Note", "", None, typ="text")}<button>Record bottling</button></form>"""
+</div>{field("note", "Note", "", None, typ="text")}{override}<button>Record bottling</button></form>"""
         steps.append(_fin_step("Bottle", "", form))
 
     in_arc = (calc.is_racked(b) or calc.is_stabilized(b) or calc.is_sweetened(b)
@@ -366,13 +384,22 @@ def _stabilize_action(b, params, vol, og, now_sg):
             f"ppm){step}. They go in together — sorbate alone smells of "
             "geraniums. Ignores any SO₂ already there; measure free SO₂ "
             "for real work.", "ok")
-        override = "" if calc.is_stable(b) else details(
-            "It is not steady yet, but I know what I'm doing",
+        problem = calc.sulfite_problem(d["free_so2_ppm"], phv)
+        if problem and problem[0] == "refuse":
+            return (banner(problem[1], "err") + pre.replace('msg ok', 'msg warn')
+                    + _stabilize_form(b, ""))
+        needs = [] if calc.is_stable(b) else ["it is not steady yet"]
+        if problem and problem[0] == "reason":
+            needs.append("the dose is past the sulfite ceiling")
+        override = details(
+            f"Record it anyway ({' and '.join(needs)})",
             '<div class="inner">' + field(
                 "override", "Reason (recorded with the dose)", "",
                 "e.g. cold-crashed and confirmed flat by taste.", typ="text")
-            + '</div>')
-        rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/stabilize">
+            + '</div>') if needs else ""
+        if problem:
+            pre = banner(problem[1], "warn") + pre
+        rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/stabilize">{once()}
 {hidden("ph", num(phv, 2))}
 {field("note", "Note", "", None, typ="text")}{override}<button>Record — both go in</button></form>"""
         return pre + rec
@@ -417,44 +444,27 @@ def _prime_action(b, params, vol):
             f"({num(d['grams_per_gal'])} g/gal). Bottle in pressure-rated "
             f"bottles only — champagne or heavy crown-cap glass. {taxline}",
             "warn" if d["over_still"] else "ok")
-        if calc.is_stabilized(b):
-            override = details(
-                "It is stabilized, but I re-pitched fresh yeast",
-                '<div class="inner">' + field("override", "Reason (recorded)",
-                "", "e.g. pitched EC-1118 at bottling.", typ="text") + "</div>")
-        elif not calc.is_stable(b):
-            override = details(
-                "It is not steady yet, but I know it is done",
-                '<div class="inner">' + field("override", "Reason (recorded)",
-                "", "e.g. confirmed flat by taste and a repeat reading.",
-                typ="text") + "</div>")
-        else:
-            override = ""
-        rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/prime">
+        refusal = calc.priming_refusal(b)
+        override = (details(
+            "Prime it anyway — I know why it is safe",
+            '<div class="inner">' + field("override", "Reason (recorded)", "",
+            "e.g. re-pitched EC-1118 at bottling; will pasteurize.",
+            typ="text") + "</div>") if refusal else "")
+        rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/prime">{once()}
 {hidden("target_vols", num(d['target_vols']))}{hidden("temp_f", num(d['temp_f']))}
 {hidden("sugar", d['sugar'])}{field("note", "Note", "", None, typ="text")}{override}
 <button>Record priming</button></form>"""
-        unsteady = ("" if calc.is_stable(b) or calc.is_stabilized(b) else
-                    banner("It has not held a steady gravity for a couple of "
-                           "days — priming a mead that is still fermenting "
-                           "over-carbonates and bursts bottles. Recording will "
-                           "ask for a reason.", "warn"))
-        return unsteady + pre + rec
+        unsafe = (banner(refusal + " Recording it will ask for a reason.",
+                         "warn") if refusal else "")
+        return unsafe + pre + rec
     return _prime_form(b, vol)
 
 
 def _prime_form(b, vol):
     bid = b["id"]
-    warn = ""
-    if calc.is_stabilized(b):
-        warn = banner("This mead is stabilized — the yeast is inhibited and "
-                      "will not carbonate unless you re-pitch fresh yeast.",
-                      "warn")
-    elif not calc.is_stable(b):
-        warn = banner("It has not held a steady gravity for a couple of days "
-                      "yet — priming a mead that is still fermenting over-"
-                      "carbonates and bursts bottles. Preview the sugar anyway; "
-                      "recording it will ask for a reason.", "warn")
+    refusal = calc.priming_refusal(b)
+    warn = (banner(refusal + " Preview the sugar anyway; recording it will "
+                   "ask for a reason.", "warn") if refusal else "")
     opts = "".join(f"<option{' selected' if k == 'honey' else ''}>{k}</option>"
                    for k in calc.SUGAR_YIELD)
     return f"""{warn}<form class="inline" method="get" action="/batches/{esc(bid)}#finish">
@@ -491,7 +501,7 @@ def _sweeten_action(b, params, vol, now_sg):
             f"To lift {num(vol)} gal from {sg(now_sg)} to {sg(to)}: about "
             f"{num(honey)} lb honey, stirred in a little at a time and tasted. "
             "Confirm the gravity with a hydrometer after it is mixed.", "ok")
-        rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/sweeten">
+        rec = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/sweeten">{once()}
 {hidden("to_sg", sg(to))}{field("note", "Note", "", None, typ="text")}{ov}
 <button>Record back-sweetening</button></form>"""
         return warn + pre + rec
@@ -516,6 +526,7 @@ def batch(req):
     n = b.get("nutrients") or {}
     now = datetime.now()
     act = calc.next_action(b, now, product_name(n.get("product")))
+    closed = calc.is_bottled(b)     # bottled: the cellar record is closed
 
     facts = kv([
         ("Recipe", r.get("name") or r.get("slug") or "—", None),
@@ -576,7 +587,9 @@ def batch(req):
             f'<div class="idrow"><div><span class="bid">{esc(b["id"])}</span>'
             f'{stats(b, now)}</div></div>'
             f'<div class="nextbar"><b>Next</b><span>{esc(act["text"])}</span>'
-            f'<a class="btn noprint" href="#log">Log a reading</a></div>')
+            + ("" if closed else
+               '<a class="btn noprint" href="#log">Log a reading</a>')
+            + '</div>')
     view = "curve" if req.params.get("view") == "curve" else "ledger"
     toggle = ('<div class="seg noprint">' + "".join(
         f'<a href="/batches/{esc(b["id"])}?view={v}"'
@@ -584,7 +597,7 @@ def batch(req):
         for v, label in (("ledger", "Ledger"), ("curve", "Curve")))
         + "</div>")
     seen = curve(b) if view == "curve" else ledger_table(b)
-    body = (head + log_form(b["id"], req.params)
+    body = (head + ("" if closed else log_form(b["id"], req.params))
             + f'<div class="sheet-head"><h2>The log</h2>{toggle}</div>{seen}'
             + finishing_card(b, req.params)
             + dispositions_section(b)
@@ -609,7 +622,7 @@ def log_reading(req):
     try:
         b, corrected = req.store.add_reading(
             batch_id, f.get("reading"), f.get("sample_f"),
-            f.get("cal_f"), f.get("note"))
+            f.get("cal_f"), f.get("note"), once=f.get("once"))
     except ValueError as e:
         from urllib.parse import urlencode
         keep = {k: f.get(k, "") for k in ("reading", "sample_f", "note")
@@ -642,7 +655,8 @@ def log_feed(req):
     batch_id = req.args[0]
     try:
         b, planned = req.store.record_feed(batch_id, req.form.get("n"),
-                                           note=req.form.get("note", ""))
+                                           note=req.form.get("note", ""),
+                                           once=req.form.get("once"))
     except ValueError as e:
         return redirect(f"/batches/{batch_id}", str(e), "err")
     act = calc.next_action(
@@ -661,7 +675,7 @@ def rack(req):
     f = req.form
     try:
         b = req.store.record_racking(bid, f.get("volume_gal"),
-                                     note=f.get("note", ""))
+                                     note=f.get("note", ""), once=f.get("once"))
     except ValueError as e:
         return redirect(f"/batches/{bid}#finish", str(e), "err")
     act = calc.next_action(b, None, product_name(
@@ -679,7 +693,7 @@ def stabilize(req):
     try:
         b, d = req.store.record_stabilize(
             bid, f.get("ph"), note=f.get("note", ""),
-            override_reason=f.get("override", ""))
+            override_reason=f.get("override", ""), once=f.get("once"))
     except ValueError as e:
         return redirect(f"/batches/{bid}#finish", str(e), "err")
     return redirect(
@@ -696,7 +710,7 @@ def sweeten(req):
     try:
         b, honey = req.store.record_backsweeten(
             bid, f.get("to_sg"), note=f.get("note", ""),
-            override_reason=f.get("override", ""))
+            override_reason=f.get("override", ""), once=f.get("once"))
     except ValueError as e:
         return redirect(f"/batches/{bid}#finish", str(e), "err")
     sw = b["sweetenings"][-1]
@@ -714,7 +728,7 @@ def prime(req):
         b, d = req.store.record_priming(
             bid, f.get("target_vols"), f.get("temp_f"),
             f.get("sugar", "honey"), note=f.get("note", ""),
-            override_reason=f.get("override", ""))
+            override_reason=f.get("override", ""), once=f.get("once"))
     except ValueError as e:
         return redirect(f"/batches/{bid}#finish", str(e), "err")
     return redirect(
@@ -730,7 +744,9 @@ def bottle(req):
     f = req.form
     try:
         b = req.store.record_bottling(bid, f.get("units"), f.get("unit"),
-                                      note=f.get("note", ""))
+                                      note=f.get("note", ""),
+                                      override_reason=f.get("override", ""),
+                                      once=f.get("once"))
     except ValueError as e:
         return redirect(f"/batches/{bid}#finish", str(e), "err")
     pk = b["packaging"]
@@ -745,7 +761,8 @@ def disposition(req):
     f = req.form
     try:
         b = req.store.record_disposition(bid, f.get("kind"), f.get("qty"),
-                                         f.get("to", ""), note=f.get("note", ""))
+                                         f.get("to", ""), note=f.get("note", ""),
+                                         once=f.get("once"))
     except ValueError as e:
         return redirect(f"/batches/{bid}", str(e), "err")
     d = b["dispositions"][-1]
@@ -761,7 +778,7 @@ def tasting(req):
     f = req.form
     try:
         b = req.store.record_tasting(bid, f.get("stage"), f.get("overall"),
-                                     f.get("note", ""))
+                                     f.get("note", ""), once=f.get("once"))
     except ValueError as e:
         return redirect(f"/batches/{bid}", str(e), "err")
     t = b["tastings"][-1]
@@ -776,7 +793,7 @@ def flavor(req):
     try:
         b = req.store.record_flavor(bid, f.get("kind"), f.get("item"),
                                     f.get("qty"), f.get("unit", ""),
-                                    note=f.get("note", ""))
+                                    note=f.get("note", ""), once=f.get("once"))
     except ValueError as e:
         return redirect(f"/batches/{bid}", str(e), "err")
     fl = b["flavors"][-1]

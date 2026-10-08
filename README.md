@@ -52,11 +52,26 @@ library only, nothing to install.
 
 ```
 data/
-  recipes/   one JSON file per recipe
-  batches/   one JSON file per must you recorded, and its readings
+  recipes/        one JSON file per recipe
+  batches/        one JSON file per must you recorded, and everything after
+  vessels.json    your carboys and tanks
+  documents.json  permits and policies, with their expiry dates
+  reports/        TTB reports you've written out
 ```
 
-Plain JSON, human-readable, versioned by git. Batch ids are `B-YYYY-NNN`;
+Plain JSON, human-readable. **`data/` is never committed** — this repository
+is public, and these are the business's records (production, sales, permit
+numbers). So git is not their backup: keep a copy elsewhere. The simplest way
+is to point the app at a folder that is already backed up, e.g. one Time
+Machine or iCloud Drive covers:
+
+```
+BREW_DATA=~/Documents/warblers-cellar python3 -m brew
+```
+
+(or `--data DIR`). The app prints which folder it is using when it starts.
+
+Batch ids are `B-YYYY-NNN`;
 the id field is prefilled and editable, so if you're continuing a numbering
 from elsewhere, type it the first time and the sequence carries on.
 
