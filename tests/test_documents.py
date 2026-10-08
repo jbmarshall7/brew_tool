@@ -15,7 +15,9 @@ from brew import calc
 from brew.server import Request, dispatch
 from brew.store import Store
 
-TODAY = date(2026, 9, 11)
+# the views read date.today(), so the tests must too — a frozen date here
+# turned 'expiring in 15 days' into 'expired' two weeks after it was written
+TODAY = date.today()
 
 
 def on(days):
@@ -156,6 +158,20 @@ class DocPageTest(unittest.TestCase):
         self.post("/documents/add", {"label": "Permit", "expires": on(400)})
         home = self.get("/").body
         self.assertNotIn("Compliance", home)
+
+    def test_a_broken_documents_file_costs_a_banner_not_today(self):
+        (self.root / "documents.json").write_text('{"documents": [,]}')
+        r = self.get("/")
+        self.assertEqual(r.status, 200)
+        self.assertIn("read the documents file", r.body)   # the ' is escaped
+        self.assertIn("Nothing is fermenting", r.body)
+
+    def test_each_renew_box_has_its_own_id(self):
+        for label in ("Permit", "Insurance"):
+            self.post("/documents/add", {"label": label, "expires": on(30)})
+        page = self.get("/documents").body
+        ids = __import__("re").findall(r'id="([^"]+)"', page)
+        self.assertEqual(len(ids), len(set(ids)), "duplicate element ids")
 
 
 if __name__ == "__main__":

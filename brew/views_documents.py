@@ -47,7 +47,7 @@ def documents(req):
         renew = raw(
             f'<form class="mini noprint" method="post" '
             f'action="/documents/{esc(d["id"])}/renew">'
-            f'{field("expires", "", "", None, typ="date", required=True)}'
+            f'{field("expires", "", "", None, typ="date", required=True, id_="renew-" + d["id"])}'
             "<button>Renew</button></form>")
         rows.append([label, status, esc(d.get("expires") or "—"), renew])
     body = banner_for(needing)

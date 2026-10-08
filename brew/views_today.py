@@ -9,8 +9,8 @@ from datetime import datetime
 
 from . import calc
 from .chart import sparkline
-from .html import (esc, field, hidden, next_link, num, page as _page, pill,
-                   raw, sg, table)
+from .html import (banner, esc, field, hidden, next_link, num, page as _page,
+                   pill, raw, sg, table)
 from .server import Response, route
 from .sheet import product_name
 
@@ -83,9 +83,11 @@ def cellar_rows(pairs, now):
 def documents_alert(store, now):
     """The compliance banner Today shares with the Documents page, or ''."""
     from .views_documents import banner_for
-    needing = calc.documents_needing_attention(store.list_documents(),
-                                               now.date())
-    return banner_for(needing)
+    try:
+        docs = store.list_documents()
+    except ValueError as e:          # unreadable JSON: say so, keep the page
+        return banner(f"Couldn't read the documents file — {e}", "warn")
+    return banner_for(calc.documents_needing_attention(docs, now.date()))
 
 
 @route("GET", "/")
