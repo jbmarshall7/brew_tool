@@ -791,6 +791,78 @@ def ttb_report(batches, start, end):
     }
 
 
+# --- compliance documents ---------------------------------------------------
+# The one thing about a permit the app cannot derive is when it expires, so
+# that date is the only thing stored; the days remaining and whether it is a
+# problem are computed on every render, like everything else here. A lapsed
+# permit is exactly the kind of bad surprise the tool exists to prevent, so
+# Today surfaces anything already expired or due within DOC_SOON_DAYS.
+DOC_SOON_DAYS = 60
+
+
+def parse_date(text):
+    """A plain date from YYYY-MM-DD, or a ValueError in the owner's words."""
+    text = (text or "").strip()
+    try:
+        return datetime.strptime(text[:10], "%Y-%m-%d").date()
+    except (ValueError, TypeError):
+        raise ValueError(f"'{text}' isn't a date I can read — YYYY-MM-DD, "
+                         "e.g. 2027-03-01")
+
+
+def doc_days_left(expires, today):
+    """Whole days until `expires` (negative once past), None if unreadable."""
+    try:
+        return (parse_date(expires) - today).days
+    except ValueError:
+        return None
+
+
+def document_status(documents, today, soon_days=DOC_SOON_DAYS):
+    """Each document with its days-left and state, most urgent first.
+
+    state is 'expired' (past), 'expiring' (due within soon_days), 'ok', or
+    'unknown' when the date won't parse — and unknown sorts to the very top,
+    because a renewal date you cannot read is itself worth fixing.
+    """
+    order = {"unknown": 0, "expired": 1, "expiring": 2, "ok": 3}
+    out = []
+    for d in documents or []:
+        days = doc_days_left(d.get("expires"), today)
+        if days is None:
+            state = "unknown"
+        elif days < 0:
+            state = "expired"
+        elif days <= soon_days:
+            state = "expiring"
+        else:
+            state = "ok"
+        out.append(dict(d, days=days, state=state))
+    out.sort(key=lambda x: (order[x["state"]],
+                            x["days"] if x["days"] is not None else -10 ** 9,
+                            str(x.get("label") or "")))
+    return out
+
+
+def documents_needing_attention(documents, today, soon_days=DOC_SOON_DAYS):
+    """Only the documents Today should raise: expired, expiring or unreadable."""
+    return [d for d in document_status(documents, today, soon_days)
+            if d["state"] != "ok"]
+
+
+def doc_phrase(d):
+    """The one plain line for a document's state — 'expired 5 days ago'."""
+    days, state = d.get("days"), d.get("state")
+    if state == "unknown":
+        return "no readable renewal date"
+    if state == "expired":
+        n = -days
+        return f"expired {n} day{'s' if n != 1 else ''} ago"
+    if days == 0:
+        return "expires today"
+    return f"expires in {days} day{'s' if days != 1 else ''}"
+
+
 # --- ids --------------------------------------------------------------------
 def next_batch_id(existing_ids, year):
     """B-YYYY-NNN: one past the highest number already used this year."""

@@ -6,6 +6,24 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-09-11 — document-expiry surfacing (round 10, roadmap C3 light half).**
+  A `/documents` page (nav "Docs") holds the compliance documents — TTB and
+  state permits, COAs, insurance, the bond — and the single fact the app cannot
+  derive about each: when it lapses. Everything else is computed on render:
+  `calc.document_status` sorts them most-urgent-first and tags each expired /
+  expiring (within `DOC_SOON_DAYS` = 60) / current / unknown, and
+  `calc.doc_phrase` turns the days-left into a plain line ("expired 7 days ago",
+  "expires in 24 days"). The store is a single flat `documents.json`, the vessels
+  pattern, not one file per record: a handful of low-cardinality reference rows,
+  not events. Renewal is the one recurring action, so a document carries a
+  one-field Renew that moves its expiry forward in place — git keeps what it was.
+  Today shares the page's banner: `documents_needing_attention` feeds a
+  Compliance banner that shows above the cellar (and above "nothing is
+  fermenting", so an empty cellar never hides a lapsing permit). No batch fields
+  touched; this is licensed-operator memory, not brewing state. Deliberately the
+  *light* half of C3 — expiry dates and a warning, not the COLA/label-approval
+  machinery, which stays deferred until distribution forces it.
+
 - **2026-09-07 — the TTB operations report (round 9, roadmap B4).** A `/ttb`
   page (and nav item) renders the Report of Wine Premises Operations (F 5120.17)
   for any period: produced by fermentation (period pitches × volume), bottled

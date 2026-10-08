@@ -60,7 +60,7 @@ header .brand { font-family:var(--font-head); font-size:19px;
                 display:inline-flex; align-items:center; gap:11px;
                 margin-right:auto; }
 header .brand svg { display:block; }
-header nav { display:flex; gap:20px; }
+header nav { display:flex; flex-wrap:wrap; column-gap:20px; }
 header nav a { color:var(--ink); text-decoration:none; font-size:15px;
                min-height:44px; display:inline-flex; align-items:center;
                border-bottom:2px solid transparent; }
@@ -326,6 +326,9 @@ ol.steps .mut { line-height:1.5; margin-top:3px; }
 }
 @media (max-width:640px) {
   header { padding:10px 16px; gap:14px; }
+  /* six links: wrap whole links onto a second row, never split a label */
+  header nav { column-gap:16px; }
+  header nav a { white-space:nowrap; }
   main { padding:16px 14px 70px; }
   h1 { font-size:30px; }
   .card, form.inline, .inner { padding-left:18px; padding-right:18px; }
@@ -338,7 +341,7 @@ ol.steps .mut { line-height:1.5; margin-top:3px; }
 
 NAV = [("/", "Today"), ("/vessels", "Vessels"),
        ("/design", "Design & must"), ("/recipes", "Recipes"),
-       ("/ttb", "TTB")]
+       ("/ttb", "TTB"), ("/documents", "Docs")]
 
 
 class raw(str):

@@ -9,8 +9,8 @@ from datetime import datetime
 
 from . import calc
 from .chart import sparkline
-from .html import (esc, field, hidden, next_link, num, page as _page, pill,
-                   raw, sg, table)
+from .html import (banner, esc, field, hidden, next_link, num, page as _page,
+                   pill, raw, sg, table)
 from .server import Response, route
 from .sheet import product_name
 
@@ -80,13 +80,25 @@ def cellar_rows(pairs, now):
     return rows
 
 
+def documents_alert(store, now):
+    """The compliance banner Today shares with the Documents page, or ''."""
+    from .views_documents import banner_for
+    try:
+        docs = store.list_documents()
+    except ValueError as e:          # unreadable JSON: say so, keep the page
+        return banner(f"Couldn't read the documents file — {e}", "warn")
+    return banner_for(calc.documents_needing_attention(docs, now.date()))
+
+
 @route("GET", "/")
 def today(req):
     now = datetime.now()
     pairs = look_at(req.store, now)
     title = f"{now:%A, %B} {now.day}"
+    docs = documents_alert(req.store, now)
     if not pairs:
-        body = ('<p class="mut">Nothing is fermenting. Design a recipe and '
+        body = (docs
+                + '<p class="mut">Nothing is fermenting. Design a recipe and '
                 "make the must, and this page fills itself in.</p>"
                 + next_link("/design", "Design a recipe"))
         return Response(_page(title, body, "/", req.params.get("msg"),
@@ -98,7 +110,7 @@ def today(req):
             f"{len(wants)} of your {going} batch"
             f"{'es' if going != 1 else ''} want{'s' if len(wants) == 1 else ''}"
             " you today. The rest is just fermenting quietly.")
-    body = ""
+    body = docs
     if wants:
         body += ("<h2>Needs you now</h2><div class=\"attns\">"
                  + "".join(attention_card(b, a) for b, a in wants) + "</div>")

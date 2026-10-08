@@ -414,11 +414,11 @@ not re-litigated every session.
 
 ### 6.2 The resulting order
 
-**Progress (2026-09-07):** items 1–5 and the TTB-report half of item 6 are
-built and merged to `main`. What remains: document-expiry surfacing (the light
-half of item 6) and item 7 (the excise worksheets). Item 7 is the heavy,
-licensed-operator remainder, best taken as its own focused session because it
-needs Warblers' actual Connecticut filing cadence and rates as input.
+**Progress (2026-09-11):** items 1–6 are built and merged to `main` — the whole
+Near tier, vessels, dispositions, the TTB operations report and the
+document-expiry surfacing. Only item 7 remains: the excise worksheets. It is the
+heavy, licensed-operator remainder, best taken as its own focused session
+because it needs Warblers' actual Connecticut filing cadence and rates as input.
 
 Leverage-ordered given the answers, with dependencies respected. Still a menu —
 one at a time, used on a real batch before the next — but this is the sequence
@@ -447,9 +447,13 @@ absent a reason to depart from it.
    month reads as it stood. Flags gaps (missing tax class, unpriced package)
    and writes a markdown report to `data/reports/`. Makes no legal determination
    and computes no tax.
-   - **document-expiry surfacing** (the light half of C3) ← **next.** Permit / COA /
-     insurance renewal dates surfaced on Today. A lapsed permit is a bad
-     surprise the tool can prevent. Small; the remaining half of this item.
+   - **document-expiry surfacing** (the light half of C3). ✓ **Shipped** (round 10).
+     A Documents page (nav "Docs") holding each permit / licence / COA / policy
+     and the one fact the app can't derive — when it lapses — with days-left and
+     status (expired / expiring within 60 days / current) computed on render and
+     a one-field Renew that moves the date forward. Today raises a Compliance
+     banner for anything expired or expiring, even with nothing fermenting, so a
+     lapsed permit is a surprise the tool prevents.
 7. **Excise worksheets — federal + CT, with the CBMA credit** (was C2). The
    heaviest, last, once removals data exists and the sparkling tax class is
    modelled. Worksheets that state their derivations; rates are
