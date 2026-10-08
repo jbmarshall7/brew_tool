@@ -666,8 +666,9 @@ def log_feed(req):
     act = calc.next_action(
         b, None, product_name((b.get("nutrients") or {}).get("product")))
     pname = product_name((b.get("nutrients") or {}).get("product"))
+    back = "/" if req.form.get("back") == "today" else f"/batches/{batch_id}"
     return redirect(
-        f"/batches/{batch_id}",
+        back,
         f"Logged {pname} #{planned.get('n')} — {num(planned.get('g'), 1)} g. "
         f"{act['text']}",
         "warn" if act["kind"] == "warn" else "ok")
@@ -821,5 +822,28 @@ def pull_flavor(req):
 
 @route("GET", "/batches")
 def batches(req):
-    """The cellar list lives on Today — one table, not two."""
-    return redirect("/")
+    """Every batch ever made, newest first — Today shows only what's in a
+    tank or has bottles left; this is where the finished ones live."""
+    now = datetime.now()
+    rows = []
+    for b in req.store.list_batches():
+        r = b.get("recipe") or {}
+        try:
+            act = calc.next_action(b, now)
+        except (ValueError, KeyError, TypeError) as e:
+            act = {"kind": "warn", "tag": "Can't read", "text": str(e)}
+        oh = calc.units_on_hand(b)
+        rows.append([
+            raw(f'<a href="/batches/{esc(b["id"])}">{esc(b["id"])}</a>'
+                f'<span class="sub">{esc(r.get("name") or "")}</span>'),
+            esc((b.get("pitched_at") or "")[:10]),
+            calc.vol_text(b["volume_gal"]) if b.get("volume_gal") else "—",
+            raw(str(pill(act["tag"], act["kind"]))),
+            "—" if oh is None else str(oh),
+        ])
+    body = table(["Batch", "Pitched", "Volume", "Now", "Bottles on hand"],
+                 rows, empty="No batches yet — make a must from a recipe.")
+    return Response(_page("All batches", body, "/", req.params.get("msg"),
+                          req.params.get("kind", "ok"),
+                          lede=f"{len(rows)} batch{'es' if len(rows) != 1 else ''}"
+                               ", newest first."))
