@@ -1,5 +1,8 @@
 """The Design page: the sheet the owner reads, and what happens to bad input."""
+import re
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -7,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from brew import html
 from brew.server import Request, dispatch
+from brew.store import Store
 
 
 def get(path, params=None):
@@ -67,7 +71,45 @@ class DesignPageTest(unittest.TestCase):
         self.assertIn("min-height:44px", html.CSS)
         r = get("/design").body
         self.assertIn('inputmode="decimal"', r)
-        self.assertIn("<button>Recompute</button>", r)
+        self.assertIn("<button formnovalidate>Recompute</button>", r)
+
+
+class RecomputeIsNeverBlockedTest(unittest.TestCase):
+    """The save card's required fields live in the same form as Recompute.
+    Recompute (and Enter / a phone's Go, which submit through it) must skip
+    validation, or an empty name — or an empty 'what changed' on a redesign
+    — silently stops the sheet recomputing. Save must still demand them."""
+
+    SAVE = re.compile(r'<button[^>]*formaction="/recipes"[^>]*>')
+
+    def assert_recompute_free_save_strict(self, body):
+        self.assertIn("<button formnovalidate>Recompute</button>", body)
+        # Recompute is the form's first button, so it is the one Enter uses
+        first = re.search(r"<button[^>]*>", body).group(0)
+        self.assertIn("formnovalidate", first)
+        save = self.SAVE.search(body).group(0)
+        self.assertNotIn("formnovalidate", save)
+
+    def test_fresh_design(self):
+        body = get("/design").body
+        self.assertRegex(body, r'name="name"[^>]*required')
+        self.assert_recompute_free_save_strict(body)
+
+    def test_redesign(self):
+        root = Path(tempfile.mkdtemp(prefix="brew-test-"))
+        self.addCleanup(shutil.rmtree, root)
+        store = Store(root)
+        dispatch(Request("POST", "/recipes", {},
+                         {"gal": "6", "abv": "14", "og": "", "fg": "1.000",
+                          "yeast": "71B", "demand": "medium",
+                          "additions": "4", "name": "Orange Blossom"},
+                         (), store))
+        body = dispatch(Request("GET", "/design",
+                                {"recipe": "orange-blossom"}, {}, (),
+                                store)).body
+        self.assertIn("Redesign Orange Blossom", body)
+        self.assertRegex(body, r'name="changelog"[^>]*required')
+        self.assert_recompute_free_save_strict(body)
 
 
 if __name__ == "__main__":
