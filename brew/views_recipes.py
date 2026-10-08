@@ -66,9 +66,15 @@ def inputs_from_recipe(r):
 
 
 def plan_for(r, gal):
-    """The recipe at `gal`: same targets, everything else re-derived."""
+    """The recipe at `gal`: same targets, everything else re-derived —
+    including the fruit, which scales with the batch like everything else
+    (it used to stay at the design weight, so half a batch got double the
+    fruit and half the honey)."""
     inp = inputs_from_recipe(r)
     inp["gal"] = str(gal)
+    if inp.get("fruit_lb") and r.get("design_gal"):
+        lb = float(inp["fruit_lb"]) * float(gal) / float(r["design_gal"])
+        inp["fruit_lb"] = f"{round(lb, 2):g}"
     return plan_from(inp)
 
 

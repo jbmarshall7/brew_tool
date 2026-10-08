@@ -6,6 +6,36 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-10-08 — must-day numbers you can trust (round 13, from the
+  evaluation's "fix next" list).** Wrong numbers and misleading sentences,
+  taken ahead of the eight-batch usability round because they mislead:
+  - **A melomel's fruit scales with the batch.** `plan_for` used to keep the
+    design weight at any volume, so half a batch got double the fruit and the
+    honey cut to compensate.
+  - **Must day knows what the hydrometer can see.** Whole fruit gives up its
+    sugar over days, so the reading is judged against the *honey-only* target
+    and the fruit's points are added back for the OG the feeds and the record
+    use. Juice, cider and purée (`fruit_in_solution`) are already dissolved,
+    so the reading counts them — found by importing an award-winning cyser,
+    whose juice the first cut would have told the owner to put in a mesh bag
+    and then over-honey. A Fruit step joins the floor order.
+  - **Water is never negative.** When honey and fruit fill the volume on
+    their own (a cyser on juice), the sheet says "none — they fill it" and how
+    much they come to, instead of "−0.08 gal".
+  - **A typed fruit sugar of 1 is 1 %**, not 100 % (and 150 or "nan" is
+    refused); 0.10 still reads as 10 %.
+  - **The must page's "volume now" box belongs to the check** (`form="read"`):
+    it sat outside every form, so a water top-up was silently ignored.
+  - **The next-step sentence:** a batch racked before it finished is still a
+    ferment — it can be "Stalled" or "Reading is old", never "Ready to
+    stabilize" at 1.040 or "Settling" for five weeks; feed reminders stop
+    after day 7, as the schedule itself says; a stall is 24 h of elapsed
+    time, not two readings either side of midnight.
+  - **One bad file costs Today one row**, saying which file to fix — a
+    hand-edited date used to blank the page, a missing pitch date to 500 it —
+    and unparseable files are named at the top.
+  Every new test was run against the old code first and fails there.
+
 - **2026-10-08 — the books balance (round 12, from the evaluation).** The TTB
   report as first built didn't balance period to period: a racking loss was
   booked at the bottling (August +0.30 gal unexplained, September −0.15), and

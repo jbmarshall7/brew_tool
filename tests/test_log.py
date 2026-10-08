@@ -9,7 +9,7 @@ import shutil
 import sys
 import tempfile
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -181,13 +181,24 @@ class NextActionTest(unittest.TestCase):
         self.assertIn("6 points down — still moving", a["text"])
 
 
+def hours_ago(h):
+    return (datetime.now() - timedelta(hours=h)).strftime("%Y-%m-%dT%H:%M")
+
+
 class LogTestCase(unittest.TestCase):
+    # when the batch was pitched. Tests that render Today or the feed table
+    # against the real clock override this with a recent time — the feeding
+    # window shuts on day 7, so a fixed September pitch has no feed due by
+    # October (the same wall-clock trap the documents tests fell into)
+    PITCHED = RECORD["pitched_at"]
+
     def setUp(self):
         self.root = Path(tempfile.mkdtemp(prefix="brew-test-"))
         self.addCleanup(shutil.rmtree, self.root)
         self.store = Store(self.root)
         dispatch(Request("POST", "/recipes", {}, OWNER, (), self.store))
-        dispatch(Request("POST", MUST, {}, RECORD, (), self.store))
+        dispatch(Request("POST", MUST, {}, dict(RECORD, pitched_at=self.PITCHED),
+                         (), self.store))
 
     def get(self, path, params=None):
         return dispatch(Request("GET", path, params or {}, {}, (), self.store))
@@ -305,13 +316,14 @@ class BatchPageTest(LogTestCase):
 
 
 class FeedLogTest(LogTestCase):
+    PITCHED = hours_ago(25)            # feed #1 fell due an hour ago
     def test_recording_a_feed_is_an_event_not_a_tick(self):
+        given_at = hours_ago(1)
         b, planned = self.store.record_feed("B-2026-003", "1",
-                                            at="2026-09-04T16:00",
-                                            note="stirred in")
+                                            at=given_at, note="stirred in")
         f = self.file()["feeds"][0]
         self.assertEqual(f["n"], 1)
-        self.assertEqual(f["at"], "2026-09-04T16:00")
+        self.assertEqual(f["at"], given_at)
         self.assertEqual(f["g"], 6.3)          # copied from the schedule
         self.assertEqual(f["note"], "stirred in")
         self.assertEqual(planned["n"], 1)
@@ -344,10 +356,12 @@ class FeedLogTest(LogTestCase):
     def test_the_row_offers_the_button_then_shows_when_it_went_in(self):
         body = self.get("/batches/B-2026-003").body
         self.assertIn("<button class=\"quiet\">I gave this</button>", body)
-        self.store.record_feed("B-2026-003", "1", at="2026-09-04T16:00")
+        given_at = hours_ago(1)
+        self.store.record_feed("B-2026-003", "1", at=given_at)
         body = self.get("/batches/B-2026-003").body
         self.assertIn('pill ok">given', body)
-        self.assertIn("Fri Sep 4, 4:00 pm", body)
+        from brew.views_batches import when
+        self.assertIn(when(given_at), body)
 
 
 class CellarListTest(LogTestCase):
@@ -433,6 +447,7 @@ class CurveTest(LogTestCase):
 
 
 class TodayTest(LogTestCase):
+    PITCHED = hours_ago(25)            # feed #1 fell due an hour ago
     def test_a_quiet_cellar_says_so(self):
         self.store.add_reading("B-2026-003", "1.088")      # read just now
         for n in ("1", "2", "3", "4"):
@@ -461,7 +476,7 @@ class TodayTest(LogTestCase):
     def test_the_row_carries_the_trend_once_there_are_two(self):
         body = self.get("/").body
         self.assertNotIn("<polyline", body)
-        self.store.add_reading("B-2026-003", "1.088", at="2026-09-04T09:00")
+        self.store.add_reading("B-2026-003", "1.088", at=hours_ago(20))
         self.store.add_reading("B-2026-003", "1.070")      # now, so: today
         body = self.get("/").body
         self.assertIn("<polyline", body)

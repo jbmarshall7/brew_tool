@@ -15,12 +15,26 @@ from .server import Response, route
 from .sheet import product_name
 
 
+# what the problems a hand-edited file can cause look like in Python —
+# each costs that batch's row a warning, never the whole page
+UNREADABLE = (ValueError, KeyError, TypeError, AttributeError)
+
+
+def cant_read(b, e):
+    return {"kind": "warn", "tag": "Can't read",
+            "text": f"{e} — fix data/batches/{b.get('id') or '?'}.json by hand"}
+
+
 def look_at(store, now):
-    """Every batch with the one sentence about it, most urgent first."""
+    """Every batch with the one sentence about it, most urgent first. A
+    batch whose file can't be understood still gets a row, saying so."""
     out = []
     for b in store.list_batches():
-        act = calc.next_action(
-            b, now, product_name((b.get("nutrients") or {}).get("product")))
+        try:
+            act = calc.next_action(
+                b, now, product_name((b.get("nutrients") or {}).get("product")))
+        except UNREADABLE as e:
+            act = cant_read(b, e)
         out.append((b, act))
     out.sort(key=lambda pair: (pair[1]["kind"] != "warn",
                                pair[0].get("pitched_at") or ""))
@@ -63,22 +77,35 @@ def row_log(batch_id):
 def cellar_rows(pairs, now):
     rows = []
     for b, act in pairs:
-        r = b.get("recipe") or {}
-        now_sg = calc.current_sg(b)
-        rows.append([
-            raw(f'<a href="/batches/{esc(b["id"])}">{esc(b["id"])}</a>'
-                f'<span class="sub">{esc(r.get("name") or "")}'
-                f' · {num(b.get("volume_gal"))} gal</span>'),
-            str(calc.day_of(b["pitched_at"], now)),
-            raw(f'{esc(sg(now_sg) if now_sg is not None else "—")}'
-                f'<span class="sub">{esc(gravity_note(b, now))}</span>'),
-            raw(sparkline(b)),
-            raw(f'{pill(act["tag"], act["kind"])}'
-                f'<span class="sub">{esc(act["text"])}</span>'),
-            # a bottled batch takes no more readings (the store refuses them)
-            raw("" if calc.is_bottled(b) else row_log(b["id"])),
-        ])
+        try:
+            rows.append(cellar_row(b, act, now))
+        except UNREADABLE as e:
+            bad = cant_read(b, e)
+            rows.append([esc(b.get("id") or "?"), "—", "—", "",
+                         raw(f'{pill(bad["tag"], "warn")}'
+                             f'<span class="sub">{esc(bad["text"])}</span>'),
+                         ""])
     return rows
+
+
+def cellar_row(b, act, now):
+    """One cellar row: the batch, its day, its gravity, the trend, what's
+    next, and a gravity box while it can still take one."""
+    r = b.get("recipe") or {}
+    now_sg = calc.current_sg(b)
+    return [
+        raw(f'<a href="/batches/{esc(b["id"])}">{esc(b["id"])}</a>'
+            f'<span class="sub">{esc(r.get("name") or "")}'
+            f' · {num(b.get("volume_gal"))} gal</span>'),
+        str(calc.day_of(b["pitched_at"], now)),
+        raw(f'{esc(sg(now_sg) if now_sg is not None else "—")}'
+            f'<span class="sub">{esc(gravity_note(b, now))}</span>'),
+        raw(sparkline(b)),
+        raw(f'{pill(act["tag"], act["kind"])}'
+            f'<span class="sub">{esc(act["text"])}</span>'),
+        # a bottled batch takes no more readings (the store refuses them)
+        raw("" if calc.is_bottled(b) else row_log(b["id"])),
+    ]
 
 
 def documents_alert(store, now):
@@ -97,6 +124,10 @@ def today(req):
     pairs = look_at(req.store, now)
     title = f"{now:%A, %B} {now.day}"
     docs = documents_alert(req.store, now)
+    problems = req.store.unreadable()
+    if problems:
+        docs = banner("Some files couldn't be read and are left out:\n"
+                      + "\n".join(problems), "warn") + docs
     if not pairs:
         body = (docs
                 + '<p class="mut">Nothing is fermenting. Design a recipe and '

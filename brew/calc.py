@@ -32,6 +32,18 @@ FRUIT_SUGAR_PCT = {
     "peach": 0.09, "blackberry": 0.10, "strawberry": 0.05, "currant": 0.10,
     "other": None,
 }
+# Whole fruit gives up its sugar over days, so a must-day hydrometer reads
+# the honey only. Juice, cider and purée carry their sugar already dissolved,
+# so the hydrometer reads it the moment it's stirred in.
+FRUIT_IN_SOLUTION = ("juice", "cider", "concentrate", "puree", "purée",
+                     "nectar")
+
+
+def fruit_in_solution(item):
+    item = (item or "").lower()
+    return any(w in item for w in FRUIT_IN_SOLUTION)
+
+
 # Fresh fruit is mostly water, so it also adds volume — about a gallon per this
 # many pounds. A planning figure; the batch volume after fruit is what the
 # hydrometer reads against.
@@ -331,10 +343,14 @@ def fruit_sugar_pct(fruit, pct=None):
     An unlisted fruit needs a percentage given, never a silent guess.
     """
     if pct is not None and str(pct).strip() != "":
-        pct = float(pct)
-        if pct <= 0:
-            raise ValueError("sugar percentage must be above zero")
-        return pct / 100.0 if pct > 1 else pct
+        # 10 means 10 %, and 0.10 means 10 % too — but 1 means 1 %. (It used
+        # to read anything up to 1 as a fraction, so a typed 1 became 100 %.)
+        v = num(pct, "fruit sugar %", 0.01, 80, " %")
+        frac = v / 100.0 if v >= 1 else v
+        if not 0.01 <= frac <= 0.80:
+            raise ValueError(f"fruit sugar {pct} % is outside 1–80 % — type "
+                             "10 for 10 %")
+        return frac
     key = (fruit or "").strip().lower()
     if key not in FRUIT_SUGAR_PCT or FRUIT_SUGAR_PCT[key] is None:
         known = ", ".join(sorted(k for k in FRUIT_SUGAR_PCT if k != "other"))
@@ -648,6 +664,10 @@ def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
     # fruit brings its own volume, so the water target drops by that too
     wg = round(water_gal(gal, honey_lb)
                - (fruit_info["gal"] if fruit_info else 0.0), 2)
+    # the honey and fruit can fill the volume by themselves (a cyser on
+    # juice): then there is no water to add — never a negative amount
+    overfill = round(-wg, 2) if wg < 0 else 0.0
+    wg = max(wg, 0.0)
     gf_g, gf_ml = goferm(yeast)
     ppm = yan_ppm(target_abv, demand)
     total = nutrient_grams(ppm, gal, product)
@@ -658,6 +678,13 @@ def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
     note = tolerance_note(strain, target_abv)
     if note:
         warnings.append(note)
+    if overfill > 0.01:
+        what = f"the {fruit_info['item']}" if fruit_info else "the fruit"
+        warnings.append(
+            f"The honey and {what} alone come to about "
+            f"{num_(gal + overfill)} gal — more than {num_(gal)} gal, so add no "
+            "water; the gravity will run a touch under target, and the "
+            "hydrometer has the last word.")
     if fruit_info and fruit_info["over"]:
         warnings.append(
             f"{num_(fruit_info['lb'])} lb of {fruit_info['item']} alone would "
@@ -669,6 +696,7 @@ def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
         "fg": fg, "target_pts": round(points(og), 1),
         "honey_lb": honey_lb, "honey_lb_per_gal": round(honey_lb / gal, 2),
         "honey_gal": hg, "water_gal": wg, "water_l": round(wg * L_PER_GAL, 1),
+        "overfill_gal": overfill,
         "yeast_g": yeast, "sachets": y["sachets"], "yeast_rate": y["rate"],
         "yeast_by_rule": y["by_rule"], "strain": strain,
         "high_og_pitch": og > HIGH_OG_PITCH_SG,
@@ -1387,6 +1415,9 @@ def next_feed(batch, now):
     stop, now_sg = nut.get("stop_sg"), current_sg(batch)
     if stop is not None and now_sg is not None and now_sg <= stop:
         return None, True
+    pitched = batch.get("pitched_at")
+    if pitched and day_of(pitched, now) > TOSNA_LAST_DAY:
+        return None, True       # "by day 7 or the 1/3 break": day 7 is past
     given = feeds_given(batch)
     for a in nut.get("additions") or []:
         if a.get("n") in given:
@@ -1480,7 +1511,10 @@ def next_action(batch, now=None, product="Fermaid O"):
     # part-way through finishing), the next physical step outranks the
     # gravity commentary. Checked most-complete-first.
     finished = now_sg is not None and rows and now_sg <= fg + FINISHED_MARGIN
-    if finished or is_racked(batch) or is_stabilized(batch) \
+    # racked but not finished (a melomel moved to secondary at 1.040) is
+    # still a ferment: it falls through to the stalled / unread rules below,
+    # instead of "Settling" forever or "Ready to stabilize" while still sweet
+    if finished or is_stabilized(batch) \
             or is_sweetened(batch) or is_primed(batch):
         if is_sweetened(batch):
             sw = batch["sweetenings"][-1]
@@ -1522,8 +1556,10 @@ def next_action(batch, now=None, product="Fermaid O"):
 
     # 4 — stuck: a day or more with nothing to show for it
     if len(rows) >= 2:
-        gap = day_of(rows[-2]["at"], last["at"])
-        if gap >= 1 and abs(last["drop"] or 0) <= STUCK_PTS:
+        hours = (parse_when(last["at"]) - parse_when(rows[-2]["at"])) \
+            .total_seconds() / 3600
+        gap = int(hours // 24)
+        if hours >= 24 and abs(last["drop"] or 0) <= STUCK_PTS:
             fix = ("Nitrogen is done, so warm it and rouse it, then read "
                    "again in 24 h." if past_break or feed is None else
                    "Check the temperature first, then rouse it.")
