@@ -145,7 +145,8 @@ class PrimingRecordTest(SparklingTestCase):
     def test_a_still_mead_bottles_as_still(self):
         self.store.record_stabilize("B-2026-003", "3.4")
         self.store.record_bottling("B-2026-003", "28", "750 mL bottle")
-        self.assertEqual(self.file()["packaging"]["tax_class"], "still")
+        # still, and split at 16 % by the fermented ABV (this one is ~14 %)
+        self.assertEqual(self.file()["packaging"]["tax_class"], "still ≤16 %")
 
 
 class SparklingArcTest(SparklingTestCase):

@@ -692,28 +692,164 @@ def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
 # Aggregates a period from the same batches and dispositions everything else
 # reads. It SUPPORTS the filing and flags gaps; it makes no legal
 # determination and computes no tax (that is the excise worksheet's job).
+#
+# The books are kept the way the form keeps them, in two sections that must
+# each balance every period:
+#   bulk:    on hand at start + produced - bottled - losses = on hand at end
+#   bottled: on hand at start + bottled - removed - losses = on hand at end
+# Every gallon that moves is booked on the day it moved: a racking loss on the
+# racking, the bottling loss (bulk drawn less what the bottles hold) on the
+# bottling, a broken bottle on the day it broke. So the identity holds by
+# construction, and the report checks it anyway — a residual means an event
+# dated out of order, and it says so rather than filing a number that's off.
 import re as _re
 GAL_PER_LITER = 0.264172
-_UNIT_RE = _re.compile(r"(\d+(?:\.\d+)?)\s*(ml|l|liter|litre|oz|gal)\b",
-                       _re.I)
+_UNIT_RE = _re.compile(
+    r"(\d+(?:[.,]\d+)?)\s*(millilit(?:er|re)s?|ml|lit(?:er|re)s?|l|"
+    r"fl\.?\s*oz|ounces?|oz|gal(?:lon)?s?)\b", _re.I)
 # a disposition that leaves the premises for consumption or sale is a taxable
-# removal; a sample is its own line the operator classifies; breakage is a loss
+# removal; a sample is its own line the operator classifies; "other" must be
+# classified before filing; breakage is a loss
 TAXABLE_REMOVALS = ("sold", "taproom", "gift")
+BALANCE_SLACK = 0.005           # gallons: below this a residual is rounding
 
 
 def unit_gallons(unit_str):
-    """US gallons the package holds, from its name, or None if it says none."""
+    """US gallons the package holds, from its name, or None if it says none.
+    Reads 750 ml, 1.5 L, 1,5 L, 2 liters, 12 oz, 12 fl oz, 5 gallons."""
     m = _UNIT_RE.search(unit_str or "")
     if not m:
         return None
-    qty, u = float(m.group(1)), m.group(2).lower()
-    if u == "ml":
+    raw_qty, u = m.group(1), m.group(2).lower()
+    if _re.fullmatch(r"\d{1,3},\d{3}", raw_qty):          # 1,000 ml
+        qty = float(raw_qty.replace(",", ""))
+    else:                                                # 1,5 L
+        qty = float(raw_qty.replace(",", "."))
+    if u.startswith("m"):
         return qty / 1000 * GAL_PER_LITER
-    if u in ("l", "liter", "litre"):
+    if u == "l" or u.startswith("lit"):
         return qty * GAL_PER_LITER
-    if u == "oz":
+    if "oz" in u or u.startswith("ounce"):
         return qty / 128.0
-    return qty
+    return qty                                           # gallons
+
+
+def abv_alt(og, fg):
+    """The fuller ABV formula. The simple one, (OG - FG) x 131.25, is fine at
+    table strength but drifts apart from this at high gravity — OG 1.120 to
+    1.000 is 15.75 % one way, 17.55 % the other — which is exactly where the
+    16 % excise line sits."""
+    return round(76.08 * (og - fg) / (1.775 - og) * (fg / 0.794), 2)
+
+
+# The still-wine excise classes (26 USC 5041(b)), by alcohol by volume.
+STILL_CLASSES = ((16.0, "still ≤16 %"), (21.0, "still 16–21 %"),
+                 (24.0, "still 21–24 %"))
+
+
+def wine_tax_class(batch):
+    """(class, low ABV, high ABV, warning) for a batch's wine.
+
+    Sparkling if bottle-conditioned past the still limit. Otherwise a still
+    class from the ABV: a lab measurement recorded at bottling if there is
+    one, else the simple estimate from the OG and the last gravity READ
+    (never a back-sweetened target) — the same number a label would carry.
+    Gravity can't settle a class AT a line: the simple formula and the
+    fuller one bracket the truth, and only where they land on opposite sides
+    of 16, 21 or 24 % does the report ask for a lab ABV. (Flagging every
+    batch that merely comes close would teach the owner to ignore flags.)
+    """
+    pk = batch.get("packaging") or {}
+    if batch.get("primings"):
+        vols = batch["primings"][-1].get("target_vols") or 0
+        if vols > TTB_STILL_VOLS:
+            return co2_tax_class(vols), None, None, None
+    measured = pk.get("abv_measured")
+    if measured is not None:
+        return _still_class(measured), measured, measured, None
+    og = (batch.get("measured") or {}).get("og")
+    fg = last_read_sg(batch)
+    if not og or fg is None:
+        return (pk.get("tax_class") or "still (ABV unknown)", None, None,
+                "no OG and finished gravity on record, so the ABV — and with "
+                "it the still class — can't be estimated")
+    simple, fuller = abv(og, fg), abv_alt(og, fg)
+    lo, hi = min(simple, fuller), max(simple, fuller)
+    cls = _still_class(simple)
+    for line, _ in STILL_CLASSES:
+        if lo <= line < hi:        # "not over 16" one way, over it the other
+            return cls, lo, hi, (
+                f"its ABV estimates {_g1(lo)}–{_g1(hi)} % reach across the "
+                f"{_g1(line)} % line, where the tax class (and rate) changes — "
+                "confirm with a lab measurement and record it at bottling")
+    return cls, lo, hi, None
+
+
+def _still_class(pct):
+    for line, label in STILL_CLASSES:
+        if pct <= line:
+            return label
+    return "over 24 % — not wine for excise"
+
+
+def _day_before(d):
+    return (parse_date(d) - timedelta(days=1)).isoformat()
+
+
+def _bulk_as_of(b, day):
+    """Gallons in the tank at the end of `day`: none before the pitch or
+    after the bottling, else the last racking's volume, else the must's."""
+    if (b.get("pitched_at") or "9999")[:10] > day:
+        return 0.0
+    pk = b.get("packaging")
+    if pk and (pk.get("at") or "")[:10] <= day:
+        return 0.0
+    g = b.get("volume_gal") or 0.0
+    for rk in sorted(b.get("rackings") or [], key=lambda r: r.get("at") or ""):
+        if (rk.get("at") or "")[:10] <= day and rk.get("volume_gal") is not None:
+            g = rk["volume_gal"]
+    return float(g)
+
+
+def _bottling(b):
+    """(bulk drawn, gallons in the bottles, gallons per unit, gap or None)."""
+    pk = b["packaging"]
+    drawn = float(b.get("volume_gal") or 0.0)
+    for rk in sorted(b.get("rackings") or [], key=lambda r: r.get("at") or ""):
+        if (rk.get("at") or "") <= (pk.get("at") or "") \
+                and rk.get("volume_gal") is not None:
+            drawn = float(rk["volume_gal"])
+    units = pk.get("units") or 0
+    ug = unit_gallons(pk.get("unit"))
+    if ug is None:
+        ug = drawn / units if units else 0.0
+        return drawn, drawn, ug, (
+            f"{b['id']}: package '{pk.get('unit')}' states no volume, so each "
+            "unit is taken as the bulk drawn ÷ the count — record the size "
+            "(e.g. '750 ml') for a real bottling-loss figure")
+    return drawn, units * ug, ug, None
+
+
+def _units_as_of(b, day):
+    pk = b.get("packaging")
+    if not pk or (pk.get("at") or "")[:10] > day:
+        return 0
+    out = sum(d.get("qty") or 0 for d in b.get("dispositions") or []
+              if (d.get("at") or "")[:10] <= day)
+    return (pk.get("units") or 0) - out
+
+
+def _stage_as_of(b, day):
+    """Where a batch in bulk stood on `day` — from events on or before it."""
+    def by(key):
+        return any((e.get("at") or "")[:10] <= day for e in b.get(key) or [])
+    if by("stabilizations"):
+        return "stabilized"
+    if by("primings"):
+        return "primed"
+    if by("rackings"):
+        return "racked"
+    return "fermenting"
 
 
 def _within(at, start, end):
@@ -721,109 +857,156 @@ def _within(at, start, end):
 
 
 def ttb_report(batches, start, end):
-    """The period's operations lines. All gallons; every figure derived."""
-    production, bottled, removals, losses = [], [], {}, []
-    gaps = []
-    prod_gal = bott_gal = loss_gal = 0.0
+    """The period's operations lines and its two balances. All gallons;
+    every figure derived from the batch files."""
+    parse_date(start), parse_date(end)             # a bad date fails loudly
+    if start > end:
+        raise ValueError(f"the period starts ({start}) after it ends ({end})")
+    before = _day_before(start)
+    production, bottled, losses, gaps = [], [], [], []
+    removals, taxable_by_class = {}, {}
+    bulk_inv, bottled_inv = [], []
+    T = dict(begin_bulk=0.0, begin_bottled=0.0, produced=0.0,
+             drawn=0.0, packaged=0.0, bulk_loss=0.0, removed=0.0,
+             bottled_loss=0.0, end_bulk=0.0, end_bottled=0.0)
 
     for b in sorted(batches, key=lambda x: x.get("id") or ""):
-        bid = b.get("id")
-        r = (b.get("recipe") or {})
-        pk = b.get("packaging") or {}
-        unit_gal = unit_gallons(pk.get("unit")) if pk else None
+        bid, pk = b.get("id"), b.get("packaging") or {}
+        cls, lo, hi, warn = wine_tax_class(b)
+        if warn and pk and (pk.get("at") or "")[:10] <= end:
+            gaps.append(f"{bid}: {warn}")
+        ug = None
+        if pk:
+            drawn, packaged, ug, gap = _bottling(b)
+            if gap:
+                gaps.append(gap)
+        T["begin_bulk"] += _bulk_as_of(b, before)
+        T["end_bulk"] += _bulk_as_of(b, end)
+        if pk:
+            T["begin_bottled"] += _units_as_of(b, before) * ug
+            T["end_bottled"] += _units_as_of(b, end) * ug
 
         # A — produced by fermentation: the tank was filled this period
         if _within(b.get("pitched_at"), start, end):
-            g = round(b.get("volume_gal") or 0, 2)
-            prod_gal += g
-            production.append({"batch": bid, "recipe": r.get("name"),
-                               "started": (b["pitched_at"] or "")[:10], "gal": g})
+            g = float(b.get("volume_gal") or 0.0)
+            T["produced"] += g
+            production.append({"batch": bid,
+                               "recipe": (b.get("recipe") or {}).get("name"),
+                               "started": b["pitched_at"][:10], "gal": round(g, 2)})
 
-        # B — bottled this period
+        # losses in bulk: each racking leaves the lees behind, on its own day
+        prev = float(b.get("volume_gal") or 0.0)
+        for rk in sorted(b.get("rackings") or [], key=lambda r: r.get("at") or ""):
+            if rk.get("volume_gal") is None:
+                continue
+            loss = prev - float(rk["volume_gal"])
+            prev = float(rk["volume_gal"])
+            if pk and (rk.get("at") or "") > (pk.get("at") or ""):
+                gaps.append(f"{bid}: a racking dated after the bottling")
+                continue
+            if _within(rk.get("at"), start, end):
+                if loss < -BALANCE_SLACK:
+                    gaps.append(f"{bid}: racking on {rk['at'][:10]} shows "
+                                f"{_g2(-loss)} gal MORE than before — check it")
+                T["bulk_loss"] += loss
+                if abs(loss) > BALANCE_SLACK:
+                    losses.append({"batch": bid, "gal": round(loss, 3),
+                                   "date": rk["at"][:10], "why": "racking"})
+
+        # B — bottled this period: what went into the bottles, and the
+        # bottling loss (bulk drawn less what they hold) on the same day
         if pk and _within(pk.get("at"), start, end):
-            g = round(pk.get("volume_gal") or 0, 2)
-            bott_gal += g
-            tc = pk.get("tax_class") or "(unrecorded)"
-            if pk.get("tax_class") is None:
-                gaps.append(f"{bid}: bottled with no tax class on record")
+            T["drawn"] += drawn
+            T["packaged"] += packaged
+            T["bulk_loss"] += drawn - packaged
             bottled.append({"batch": bid, "units": pk.get("units"),
-                            "unit": pk.get("unit"), "gal": g, "tax_class": tc})
-            # C — losses: bulk that went in the tank but not into bottles
-            shortfall = round((b.get("volume_gal") or 0) - g, 2)
-            if shortfall > 0.05:
-                loss_gal += shortfall
-                losses.append({"batch": bid, "gal": shortfall,
-                               "date": (pk["at"] or "")[:10], "why": "bulk-to-bottle"})
+                            "unit": pk.get("unit"), "gal": round(packaged, 3),
+                            "drawn_gal": round(drawn, 3), "tax_class": cls})
+            if drawn - packaged < -BALANCE_SLACK:
+                gaps.append(f"{bid}: the bottles hold {_g2(packaged)} gal but "
+                            f"only {_g2(drawn)} gal was in the tank — check the "
+                            "count or the package size")
+            elif drawn - packaged > BALANCE_SLACK:
+                losses.append({"batch": bid, "gal": round(drawn - packaged, 3),
+                               "date": pk["at"][:10], "why": "bottling"})
 
-        # C — removals and breakage-losses from dispositions this period
+        # C — removals and breakage from the bottled stock
         for d in b.get("dispositions") or []:
             if not _within(d.get("at"), start, end):
                 continue
-            g = round((d.get("qty") or 0) * (unit_gal or 0), 3)
+            g = (d.get("qty") or 0) * (ug or 0.0)
             if d["kind"] == "breakage":
-                loss_gal += g
-                losses.append({"batch": bid, "gal": g,
-                               "date": (d["at"] or "")[:10], "why": "breakage"})
+                T["bottled_loss"] += g
+                losses.append({"batch": bid, "gal": round(g, 3),
+                               "date": d["at"][:10], "why": "breakage"})
                 continue
-            bucket = ("samples" if d["kind"] == "sample"
-                      else pk.get("tax_class") or "(unrecorded)"
-                      if d["kind"] in TAXABLE_REMOVALS else d["kind"])
+            T["removed"] += g
+            if d["kind"] == "sample":
+                bucket = "samples"
+            elif d["kind"] in TAXABLE_REMOVALS:
+                bucket = cls
+                taxable_by_class[cls] = taxable_by_class.get(cls, 0.0) + g
+            else:
+                bucket = "other — classify"
+                gaps.append(f"{bid}: {d.get('qty')} unit(s) removed as "
+                            f"'{d['kind']}' — classify before filing")
             row = removals.setdefault(bucket, {"gal": 0.0, "units": 0, "rows": []})
             row["gal"] = round(row["gal"] + g, 3)
             row["units"] += d.get("qty") or 0
-            row["rows"].append({"batch": bid, "date": (d["at"] or "")[:10],
+            row["rows"].append({"batch": bid, "date": d["at"][:10],
                                 "kind": d["kind"], "units": d.get("qty"),
-                                "gal": g, "to": d.get("to")})
-            if d["kind"] in TAXABLE_REMOVALS and pk.get("tax_class") is None:
-                gaps.append(f"{bid}: taxable removal with no tax class on record")
-            if unit_gal is None and pk:
-                gaps.append(f"{bid}: package '{pk.get('unit')}' states no "
-                            "volume, so removal gallons can't be computed")
+                                "gal": round(g, 3), "to": d.get("to")})
 
-    # E — period-end inventory (what was on hand as of `end`, not now)
-    bulk_inv, bottled_inv = [], []
-    bulk_gal = bottled_inv_gal = 0.0
-    for b in sorted(batches, key=lambda x: x.get("id") or ""):
-        pk = b.get("packaging") or {}
-        pitched = (b.get("pitched_at") or "")[:10]
-        if not pitched or pitched > end:
-            continue
-        if not pk or (pk.get("at") or "")[:10] > end:
-            # still in bulk at period end: the volume as of `end` — the last
-            # racking on or before it, else the volume the must was made to
-            g = b.get("volume_gal") or 0
-            for rk in sorted(b.get("rackings") or [], key=lambda r: r.get("at") or ""):
-                if (rk.get("at") or "")[:10] <= end and rk.get("volume_gal") is not None:
-                    g = rk["volume_gal"]
-            g = round(g, 2)
-            if g > 0:
-                bulk_gal += g
-                bulk_inv.append({"batch": b["id"], "gal": g,
-                                 "tag": next_action(b).get("tag")})
-        else:
-            # bottled by `end`: units made less what had left by `end`
-            out = sum(d.get("qty", 0) for d in b.get("dispositions") or []
-                      if (d.get("at") or "")[:10] <= end)
-            oh = (pk.get("units") or 0) - out
-            ug = unit_gallons(pk.get("unit")) or 0
-            g = round(oh * ug, 2)
+        # E — on hand at the end of the period
+        g = _bulk_as_of(b, end)
+        if g > 0:
+            bulk_inv.append({"batch": bid, "gal": round(g, 2),
+                             "tag": _stage_as_of(b, end)})
+        if pk:
+            oh = _units_as_of(b, end)
             if oh > 0:
-                bottled_inv_gal += g
-                bottled_inv.append({"batch": b["id"], "units": oh,
-                                    "unit": pk.get("unit"), "gal": g,
-                                    "tax_class": pk.get("tax_class") or "(unrecorded)"})
+                bottled_inv.append({"batch": bid, "units": oh,
+                                    "unit": pk.get("unit"),
+                                    "gal": round(oh * ug, 2), "tax_class": cls})
 
-    taxable_gal = round(sum(v["gal"] for k, v in removals.items()
-                            if k not in ("samples", "gift")), 2)
+    bulk_res = (T["begin_bulk"] + T["produced"] - T["packaged"]
+                - T["bulk_loss"] - T["end_bulk"])
+    bottled_res = (T["begin_bottled"] + T["packaged"] - T["removed"]
+                   - T["bottled_loss"] - T["end_bottled"])
+    for name, res in (("bulk", bulk_res), ("bottled", bottled_res)):
+        if abs(res) > BALANCE_SLACK:
+            gaps.append(f"the {name} section doesn't balance by {_g2(res)} gal "
+                        "— an event is dated out of order")
+    r2 = lambda x: round(x + 0.0, 2)                     # noqa: E731
     return {
         "start": start, "end": end,
-        "production": production, "production_gal": round(prod_gal, 2),
-        "bottled": bottled, "bottled_gal": round(bott_gal, 2),
-        "removals": removals, "taxable_removals_gal": taxable_gal,
-        "losses": losses, "losses_gal": round(loss_gal, 2),
-        "bulk_inventory": bulk_inv, "bulk_inventory_gal": round(bulk_gal, 2),
+        "begin": {"bulk_gal": r2(T["begin_bulk"]),
+                  "bottled_gal": r2(T["begin_bottled"])},
+        "production": production, "production_gal": r2(T["produced"]),
+        "bottled": bottled, "bottled_gal": r2(T["packaged"]),
+        "removals": removals,
+        "taxable_removals_gal": r2(sum(taxable_by_class.values())),
+        "taxable_by_class": {k: r2(v) for k, v in sorted(taxable_by_class.items())},
+        "losses": sorted(losses, key=lambda x: (x["date"], x["batch"])),
+        "losses_gal": r2(T["bulk_loss"] + T["bottled_loss"]),
+        "bulk_losses_gal": r2(T["bulk_loss"]),
+        "bottled_losses_gal": r2(T["bottled_loss"]),
+        "bulk_inventory": bulk_inv, "bulk_inventory_gal": r2(T["end_bulk"]),
         "bottled_inventory": bottled_inv,
-        "bottled_inventory_gal": round(bottled_inv_gal, 2),
+        "bottled_inventory_gal": r2(T["end_bottled"]),
+        "balance": {
+            "bulk": {"begin": r2(T["begin_bulk"]), "produced": r2(T["produced"]),
+                     "bottled": r2(T["packaged"]), "losses": r2(T["bulk_loss"]),
+                     "end": r2(T["end_bulk"]), "residual": round(bulk_res, 3)},
+            "bottled": {"begin": r2(T["begin_bottled"]),
+                        "bottled": r2(T["packaged"]),
+                        "removed": r2(T["removed"]),
+                        "losses": r2(T["bottled_loss"]),
+                        "end": r2(T["end_bottled"]),
+                        "residual": round(bottled_res, 3)},
+            "ok": abs(bulk_res) <= BALANCE_SLACK
+            and abs(bottled_res) <= BALANCE_SLACK,
+        },
         "gaps": sorted(set(gaps)),
     }
 

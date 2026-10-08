@@ -76,7 +76,10 @@ def rows(p):
          "OG − (OG − FG) ÷ 3 — nothing after this: late nitrogen feeds the "
          "wrong things"),
         ("Expect", f"{num(p['abv_if_dry'], 1)} % if it finishes at {sg(p['fg'])}",
-         f"(OG − FG) × {calc.ABV_FACTOR}; the estimate drifts high above ~14 %"),
+         f"(OG − FG) × {calc.ABV_FACTOR} — the simple formula. At high gravity "
+         f"it reads low: the fuller one says "
+         f"{num(calc.abv_alt(p['og'], p['fg']), 1)} % here. Near the 16 % "
+         "excise line, confirm with a lab measurement"),
     ]
     if fr:
         rows.insert(2, (

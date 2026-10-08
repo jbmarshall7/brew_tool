@@ -92,13 +92,16 @@ def stats(b, now=None):
     """Now · ABV so far · Attenuated · Day, the four figures at a glance."""
     og = (b.get("measured") or {}).get("og")
     now_sg = calc.current_sg(b)
+    # what the yeast made is read off the hydrometer, never off a sweetening
+    # target — back-sweetening adds sugar, not alcohol
+    read = calc.last_read_sg(b)
     day = calc.day_of(b["pitched_at"], now or datetime.now())
     cells = [
         ("Now", sg(now_sg) if now_sg is not None else "—"),
         ("ABV so far",
-         f"{num(calc.abv(og, now_sg), 1)} %" if og and now_sg else "—"),
+         f"{num(calc.abv(og, read), 1)} %" if og and read else "—"),
         ("Attenuated",
-         f"{calc.attenuation(og, now_sg)} %" if og and now_sg else "—"),
+         f"{calc.attenuation(og, read)} %" if og and read else "—"),
         ("Day", str(day)),
     ]
     return ('<div class="stats">' + "".join(
@@ -351,6 +354,7 @@ vessel — every dose below is per that gallon.</p>
 <div class="grid">
 <span>{field("units", "How many", "", "The count you actually filled.", step="1")}</span>
 <span>{field("unit", "Package", "750 mL bottle", "Bottle, keg, whatever it went in.", typ="text")}</span>
+<span>{field("abv_measured", "Lab ABV (optional)", "", f"Only if measured. The gravity estimate is {num(calc.abv(og, calc.last_read_sg(b)), 1) if og and calc.last_read_sg(b) else '—'} %; a lab number settles the tax class near 16 %.", id_="bottle-abv")}</span>
 </div>{field("note", "Note", "", None, typ="text")}{override}<button>Record bottling</button></form>"""
         steps.append(_fin_step("Bottle", "", form))
 
@@ -746,7 +750,8 @@ def bottle(req):
         b = req.store.record_bottling(bid, f.get("units"), f.get("unit"),
                                       note=f.get("note", ""),
                                       override_reason=f.get("override", ""),
-                                      once=f.get("once"))
+                                      once=f.get("once"),
+                                      abv_measured=f.get("abv_measured"))
     except ValueError as e:
         return redirect(f"/batches/{bid}#finish", str(e), "err")
     pk = b["packaging"]
