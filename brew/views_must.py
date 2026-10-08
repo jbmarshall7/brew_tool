@@ -27,6 +27,16 @@ CHECK_FIELDS = ("gal", "now_gal", "reading", "temp_f", "cal_f", "ph")
 LOOSE_ID = re.compile(r"(?:B-(\d{4})-)?(\d{1,3})", re.IGNORECASE)
 
 
+def fruit_pts(p):
+    """Points whole fruit will add once it gives up its sugar — none of which
+    a hydrometer sees on must day. Juice, cider and purée are already in
+    solution, so the reading includes them: nothing to add back."""
+    fr = p.get("fruit") or {}
+    if not fr or calc.fruit_in_solution(fr.get("item")):
+        return 0.0
+    return fr.get("points") or 0.0
+
+
 def feeds(p, og=None, gal=None):
     """The feeding numbers: from the plan, or re-sized from a measured OG."""
     n = p["additions"]
@@ -50,12 +60,32 @@ def steps(p, og=None, gal=None):
     cups = {1: "one cup", 2: "two cups", 3: "three cups", 4: "four cups",
             5: "five cups", 6: "six cups"}.get(n, f"{n} cups")
     when = feed_when(n, sg(fd["stop"]))
+    fr = p.get("fruit")
+    room = (f"The honey takes {num(p['honey_gal'])} gal and the fruit about "
+            f"{num(fr['gal'])}." if fr else
+            f"The honey takes the other {num(p['honey_gal'])} gal.")
     items = [
         ("Honey", lb_oz(p["honey_lb"]),
          "Don't boil it — a warm water bath if it's slow to pour."),
-        ("Water", f"start with {gal_l(p['water_gal'])}",
-         f"The honey takes the other {num(p['honey_gal'])} gal. Stir until it "
-         f"is one liquid, then top to the {num(p['gal'])} gal mark."),
+    ]
+    if fr and calc.fruit_in_solution(fr["item"]):
+        items.append((
+            "Fruit", f"{lb_oz(fr['lb'])} {fr['item']} (~{gal_l(fr['gal'])})",
+            "Pour it in with the honey. Its sugar is already dissolved, so the "
+            "hydrometer reads it today — the check below counts it."))
+    elif fr:
+        items.append((
+            "Fruit", f"{lb_oz(fr['lb'])} {fr['item']}",
+            "In a mesh bag — crushed, or frozen and thawed so it gives up its "
+            "juice. Its sugar comes out over the next days, so today's "
+            "hydrometer reads the honey only; the check below expects that."))
+    items += [
+        ("Water", (f"start with {gal_l(p['water_gal'])}"
+                   if p["water_gal"] > 0 else "none"),
+         (f"{room} Stir until it is one liquid, then top to the "
+          f"{num(p['gal'])} gal mark." if p["water_gal"] > 0 else
+          f"{room} Together they fill the {num(p['gal'])} gal — add no "
+          "water.")),
         ("Read it", "hydrometer and pH",
          "Before the yeast goes in — the form below does the arithmetic."),
         ("Rehydrate and pitch",
@@ -107,8 +137,19 @@ def check(p, params):
             og = calc.hydro_correct(reading, temp_f, cal_f)
             lines.append(f"OG {sg(og)} (read {sg(reading)} at {num(temp_f)} "
                          f"°F, hydrometer {num(cal_f)} °F).")
-        c = calc.correction(og, p["og"], gal_now, p["fg"], strain=p["strain"])
-        target = sg(p["og"])
+        fp = fruit_pts(p)
+        honey_target = round(p["og"] - fp / 1000.0, 4)
+        c = calc.correction(og, honey_target, gal_now, p["fg"],
+                            strain=p["strain"])
+        target = sg(honey_target)
+        if fp:
+            # the fruit's sugar is coming whatever the honey does
+            c["carry_on_abv"] = round(calc.abv(og + fp / 1000.0, p["fg"]), 1)
+            lines.append(
+                f"With the {p['fruit']['item']} the hydrometer reads the honey "
+                f"only: target {target} today, and the fruit's ~"
+                f"{num(fp, 1)} points take it to {sg(p['og'])} as they come "
+                "out.")
         if c["add"] == "none":
             lines.append(f"On target — within {num(calc.ON_TARGET_PTS)} "
                          f"points of {target}, which is hydrometer resolution. "
@@ -137,6 +178,9 @@ def check(p, params):
         lines.append(v["text"])
         if v["kind"] == "warn":
             kind = "warn"
+    if og is not None and fruit_pts(p):
+        # carried forward to the feeds and the record: the must's real OG
+        og = round(og + fruit_pts(p) / 1000.0, 4)
     return "\n".join(lines), kind, og, c
 
 
@@ -162,6 +206,11 @@ def read_form(slug, p, params, checked, correction=None, verdict=None,
                        attrs='placeholder="3.9"')),
             (132, field("cal_f", "Hydrometer cal. °F", cal_f)),
         ))
+    # bound to the check's form by id: it sits outside the <form> for layout,
+    # and without form="read" a check never sent it (so a water top-up was
+    # silently ignored by everything downstream)
+    now_box = field("now_gal", "Volume in the carboy now (gal)", now_gal,
+                    now_hint, attrs='form="read"')
     inner = (f'<h3>Read it — before the yeast goes in</h3>'
              f'<form class="row" method="get" '
              f'action="/recipes/{esc(slug)}/must" id="read">'
@@ -169,9 +218,7 @@ def read_form(slug, p, params, checked, correction=None, verdict=None,
              f'<button>{"Check again" if checked else "Check"}</button>'
              "</form>"
              + (banner(verdict, vkind) if verdict else "")
-             + f'<div style="max-width:230px">'
-               f'{field("now_gal", "Volume in the carboy now (gal)", now_gal, now_hint)}'
-               "</div>"
+             + '<div style="max-width:230px">' + now_box + "</div>"
              + '<p class="mut">The check writes nothing — re-read as many '
                "times as you like. Recording the pitch is the only write.</p>")
     return f'<div class="panel">{inner}</div>'
@@ -191,7 +238,7 @@ def record_form(slug, p, params, og, next_id, gal_now, now=None):
 <div class="grid">
 <span>{field("id", "Batch id", g("id", next_id), "The next number; type your own (even just 003) to continue a numbering from elsewhere.", typ="text", required=True, id_="rec-id")}</span>
 <span>{field("pitched_at", "Yeast pitched at", g("pitched_at", now), "The feeding clock starts here.", typ="datetime-local", step=None, required=True, id_="rec-pitched")}</span>
-<span>{field("og", "OG (corrected)", og_val, "From the check above, or type it.", step="0.0001", required=True, id_="rec-og")}</span>
+<span>{field("og", "OG (corrected)", og_val, (f"The honey reading plus the fruit's ~{num(fruit_pts(p), 1)} points — what the feeds are sized from." if fruit_pts(p) else "From the check above, or type it."), step="0.0001", required=True, id_="rec-og")}</span>
 <span>{field("ph", "pH", g("ph"), "Optional.", step="0.01", id_="rec-ph")}</span>
 <span>{field("volume_gal", "In the carboy now (gal)", g("volume_gal", num(gal_now)), "After any water you added — the feedings are sized from it.", id_="rec-volume")}</span>
 <span>{field("honey_lb", "Honey in (lb)", g("honey_lb", num(p["honey_lb"])), "What the scale said, including anything stirred in after the check.", id_="rec-honey")}</span>

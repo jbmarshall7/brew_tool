@@ -50,10 +50,16 @@ def rows(p):
           "figure; the hydrometer has the last word")),
         ("Honey's own room", f"~{num(p['honey_gal'])} gal",
          f"{num(p['honey_lb'])} ÷ {num(calc.HONEY_LB_PER_GAL)} lb per gal"),
-        ("Water", value(gal_l(p["water_gal"]),
-                        f"then top to the {num(p['gal'])} gal mark"),
-         f"{num(p['gal'])} − {num(p['honey_gal'])}; the mark is the truth, "
-         "this is where to start"),
+        ("Water", value(gal_l(p["water_gal"]) if p["water_gal"] > 0 else "none",
+                        f"then top to the {num(p['gal'])} gal mark"
+                        if p["water_gal"] > 0 else
+                        "the honey and fruit fill it"),
+         (f"{num(p['gal'])} − {num(p['honey_gal'])} honey"
+          + (f" − {num(fr['gal'])} fruit" if fr else "")
+          + "; the mark is the truth, this is where to start")
+         if p["water_gal"] > 0 else
+         f"they come to ~{num(p['gal'] + p.get('overfill_gal', 0))} gal on "
+         "their own"),
         ("Yeast", value(f"{num(p['yeast_g'], 1)} g {p['strain']}",
                         f"({p['sachets']} sachet{'s' if p['sachets'] != 1 else ''})"),
          f"{num(p['yeast_rate'], 1)} g per gal"
@@ -86,7 +92,10 @@ def rows(p):
             "Fruit", value(f"{num(fr['lb'])} lb {fr['item']}",
                            f"~{num(fr['gal'])} gal, {num(fr['sugar_lb'])} lb sugar"),
             f"{fr['sugar_pct']} % fermentable sugar → {num(fr['points'], 1)} "
-            "points; confirm OG by hydrometer once the fruit gives up its sugar"))
+            + ("points, already dissolved — the hydrometer reads them on must "
+               "day" if calc.fruit_in_solution(fr["item"]) else
+               "points; confirm OG by hydrometer once the fruit gives up its "
+               "sugar")))
     return rows
 
 
