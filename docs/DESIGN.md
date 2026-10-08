@@ -6,6 +6,40 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-10-08 — the books balance (round 12, from the evaluation).** The TTB
+  report as first built didn't balance period to period: a racking loss was
+  booked at the bottling (August +0.30 gal unexplained, September −0.15), and
+  "bottled" counted the bulk gallons, not what the bottles held, so the
+  filling loss was never reported. Now it keeps the books the way F 5120.17
+  does — two sections, each `on hand at start + in − out − losses = on hand at
+  end` — and books every gallon on the day it moved: a racking loss on the
+  racking, the bottling loss (bulk drawn − units × size) on the bottling, a
+  broken bottle on the day it broke. The page leads with both equations and a
+  green "the books balance"; any residual is a gap naming the cause. A test
+  walks a store-built batch from July to October and asserts every month
+  balances and each month's end is the next month's start.
+  - **Beginning inventory** is shown, as the form has it.
+  - **Still wine splits at 16 / 21 / 24 %** (`wine_tax_class`), by the ABV a
+    label would carry: a lab ABV recorded at bottling if there is one (new,
+    optional field), else the simple estimate from the OG and the last
+    gravity *read*. Gravity can't settle a class *at* a line — the simple
+    formula and the fuller one (`abv_alt`) bracket the truth — so only where
+    they land on opposite sides of a line does the report ask for a lab ABV.
+    (Classing by the higher estimate was tried and rejected: past OG ~1.140
+    the fuller formula overshoots, and would have sent an 18 % sack to the
+    21–24 % class. Flagging anything merely *near* a line was rejected too:
+    it flagged every 14 % batch, and a flag that is always on gets ignored.)
+  - **ABV no longer drops when a mead is back-sweetened** — ABV and
+    attenuation come from the last reading, not the sweetening target. The
+    sheet's note had it backwards ("drifts high"); it now says the simple
+    formula reads low at high gravity, and shows the fuller figure.
+  - The audit's smaller items: package names like "2 liters", "1,5 L",
+    "12 fl oz", "5 gallons" are read; an unsized package is a gap (and still
+    balances, at bulk ÷ count per unit); an "other" removal is its own bucket
+    to classify, never silently taxable; the bulk stage is as of the period
+    end (August no longer shows a batch as "Bottled"); a bad or backwards
+    period is a banner, not a 500.
+
 - **2026-10-08 — it refuses the dangerous thing (round 11, from the
   evaluation).** An audit found the guardrails were written per designed path,
   so the paths nobody designed were open: a batch the app itself called "still

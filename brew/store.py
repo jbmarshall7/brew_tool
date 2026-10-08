@@ -480,7 +480,7 @@ class Store:
         return batch
 
     def record_bottling(self, batch_id, units, unit, at=None, note="",
-                        override_reason=None, once=None):
+                        override_reason=None, once=None, abv_measured=None):
         """Bottle it: the terminal event. Units and the package they went in.
 
         Refused whenever calc.bottling_refusal says sealing it in glass now is
@@ -505,13 +505,19 @@ class Store:
             "note": (note or "").strip()}, once)
         if refusal:
             pkg["override"] = override_reason.strip()
+        if not calc.blank(abv_measured):
+            # a lab (or ebulliometer) ABV: what the label and the tax class
+            # follow, in place of the gravity estimate
+            pkg["abv_measured"] = calc.num(abv_measured, "measured ABV", 0.5,
+                                           24, " %")
         if calc.is_primed(batch):
             pr = batch["primings"][-1]
             pkg["conditioned"] = True
             pkg["target_vols"] = pr["target_vols"]
-            pkg["tax_class"] = pr["tax_class"]
-        else:
-            pkg["tax_class"] = "still"
+        # the class it was bottled as — sparkling, or still split at 16 / 21 %
+        # by the fermented ABV (the TTB report re-derives it, and says so if
+        # the estimate sits near a line)
+        pkg["tax_class"] = calc.wine_tax_class(batch)[0]
         batch["packaging"] = pkg
         self.save_batch(batch)
         return batch
