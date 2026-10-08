@@ -274,7 +274,7 @@ def finishing_card(b, params):
                        f"{when(last['at'])}{note}")])
         again = details("Racked again", f"""<div class="inner">
 <form class="inline" method="post" action="/batches/{esc(bid)}/rack">{once()}
-{field("volume_gal", "Volume now (gal)", num(vol), "Measured after racking.")}
+{field("volume_gal", "Volume now", num(vol), "Measured after racking — gallons, or 2.9 bbl.", typ="text")}
 {field("note", "Note", "", None, typ="text")}<button class="quiet">Record another racking</button></form></div>""")
         steps.append(_fin_step("Rack off the lees",
                                summary + ("" if closed else again), ""))
@@ -282,7 +282,7 @@ def finishing_card(b, params):
         form = f"""<form class="inline" method="post" action="/batches/{esc(bid)}/rack">{once()}
 <p class="mut">Rack once it falls clear. Record the volume actually in the
 vessel — every dose below is per that gallon.</p>
-{field("volume_gal", "Volume now (gal)", num(vol), "A little less than the batch — racking leaves the lees behind.")}
+{field("volume_gal", "Volume now", num(vol), "A little less than the batch — racking leaves the lees behind. Gallons, or 2.9 bbl.", typ="text")}
 {field("note", "Note", "", None, typ="text")}<button>Record racking</button></form>"""
         steps.append(_fin_step("Rack off the lees", "", form))
 

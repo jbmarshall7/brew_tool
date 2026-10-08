@@ -320,7 +320,7 @@ class Store:
         self._replay(batch.get("rackings"), once, f"/batches/{batch_id}")
         self._open(batch, "a racking")
         when = self._when(batch, at)
-        vol = calc.num(volume_gal, "volume", 0.05, 1000, " gal")
+        vol = calc.parse_volume(volume_gal, "volume", 0.05)
         have = calc.current_volume(batch)
         if have and vol > have + 0.05:
             raise ValueError(
@@ -550,7 +550,7 @@ class Store:
         vid = f"V-{max([int(v['id'].split('-')[1]) for v in vessels if v.get('id', '').startswith('V-') and v['id'].split('-')[1].isdigit()], default=0) + 1:03d}"
         v = {"id": vid, "name": name}
         if not calc.blank(gal):
-            v["gal"] = calc.num(gal, "capacity", 0.1, 10000, " gal")
+            v["gal"] = calc.parse_volume(gal, "capacity", 0.1, 10000)
         vessels.append(self._stamp(v, once))
         self.write_json(self.vessels_path(), {"vessels": vessels})
         return v

@@ -244,8 +244,8 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(p["additions"], 4)
 
     def test_nonsense_refused_in_plain_words(self):
-        with self.assertRaisesRegex(ValueError, "isn't a number"):
-            c.plan("abc", 12)
+        with self.assertRaisesRegex(ValueError, "isn't something I can read"):
+            c.plan("abc", 12)              # the volume box takes units now
         with self.assertRaisesRegex(ValueError, "target strength"):
             c.plan(6)
         with self.assertRaisesRegex(ValueError, "above 25"):

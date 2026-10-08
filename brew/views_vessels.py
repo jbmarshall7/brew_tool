@@ -20,7 +20,7 @@ def vessels(req):
     rows = []
     for o in occ:
         v = o["vessel"]
-        cap = f"{num(v.get('gal'))} gal" if v.get("gal") else ""
+        cap = calc.vol_text(v["gal"]) if v.get("gal") else ""
         if o["free"]:
             state = raw(str(pill("free", "ok")))
             holds = ""
@@ -41,7 +41,7 @@ def vessels(req):
     add = f'''<form class="inline" method="post" action="/vessels/add">{once()}
 <div class="grid">
 <span>{field("name", "Name", "", "Carboy 1, Fermenter 2, the 15-gal tank…", typ="text", required=True)}</span>
-<span>{field("gal", "Capacity (gal)", "", "Optional.")}</span>
+<span>{field("gal", "Capacity", "", "Optional. Gallons, or 3 bbl for the conical.", typ="text")}</span>
 </div><button>Add vessel</button></form>'''
     body += details("Add a vessel", f'<div class="inner">{add}</div>',
                     open_=not vs)

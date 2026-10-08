@@ -152,27 +152,43 @@ def save(req):
 # --- GET /recipes: the list -------------------------------------------------
 @route("GET", "/recipes")
 def recipes(req):
+    """Every recipe, and one box to make them all at your size: type 6, a
+    bucket's 7.9 gal or the conical's 3 bbl once, and every Make button and
+    recipe link follows it. Blank shows each at the size it was published."""
+    msg, kind = req.params.get("msg"), req.params.get("kind", "ok")
+    size_text = (req.params.get("size") or "").strip()
+    size = None
+    if size_text:
+        try:
+            size = calc.parse_volume(size_text, "size")
+        except ValueError as e:
+            msg, kind = str(e), "err"
     rows = []
     for r in req.store.list_recipes():
-        gal = num(r.get("design_gal"))
-        rows.append([raw(f'<a href="/recipes/{esc(r["slug"])}">'
+        g = size or r.get("design_gal") or 1
+        q = esc(urlencode({"gal": num(g)}))
+        open_at = f"?{q}" if size else ""
+        rows.append([raw(f'<a href="/recipes/{esc(r["slug"])}{open_at}">'
                          f'{esc(r["name"])}</a>'
                          f'<span class="sub">{esc(strength_line(r))} · '
                          f'{esc(r.get("yeast") or "")}'
                          + (f' · {esc(r["honey"])}' if r.get("honey") else "")
                          + "</span>"),
                      raw(f'<a class="btn" href="/recipes/{esc(r["slug"])}/must'
-                         f'?gal={esc(gal)}">Make {esc(gal)} gal</a>')])
-    body = table(["Recipe", "Must"], rows,
-                 empty="No recipes yet. Design one — it's two numbers.")
+                         f'?{q}">Make {esc(calc.vol_text(g))}</a>')])
+    sizer = f"""<form class="inline noprint" method="get" action="/recipes">
+<div class="grid"><span>{field("size", "Make them at", size_text, "Gallons, BBL or liters: 6, 7.9 gal for a bucket, 3 bbl for the conical. Blank shows each at the size it was published.", typ="text", attrs='placeholder="6 gal"')}</span></div>
+<button>Show</button></form>"""
+    body = (sizer if rows else "") + table(
+        ["Recipe", "Must"], rows,
+        empty="No recipes yet. Design one — it's two numbers.")
     if not rows:
         body += next_link("/design", "Design a recipe")
     problems = req.store.unreadable()
     if problems:
         body = banner("Some files couldn't be read and are left out:\n"
                       + "\n".join(problems), "warn") + body
-    return Response(_page("Recipes", body, "/recipes", req.params.get("msg"),
-                          req.params.get("kind", "ok")))
+    return Response(_page("Recipes", body, "/recipes", msg, kind))
 
 
 # --- GET /recipes/<slug>: one recipe, at any volume --------------------------
@@ -184,7 +200,7 @@ def recipe(req):
                 or (num(last["volume_gal"]) if last and last.get("volume_gal")
                     else None)
                 or num(r.get("design_gal")))
-    p = plan_for(r, calc.num(gal_text, "volume", 0.1, 1000, " gal"))
+    p = plan_for(r, calc.parse_volume(gal_text, "volume"))
     s = r.get("strength") or {}
     strength = (f"{num(s.get('abv'), 1)} % ABV" if s.get("by") == "abv"
                 else f"OG {sg(s.get('og') or 0)}")
@@ -195,12 +211,13 @@ def recipe(req):
         ("Honey", r.get("honey") or "—",
          f"{num(p['honey_lb_per_gal'])} lb per gallon"),
         ("Yeast", f"{r.get('yeast') or '—'}",
-         f"{num(p['yeast_g'], 1)} g at {num(p['gal'])} gal, whole sachets"),
+         f"{num(p['yeast_g'], 1)} g at {calc.vol_text(p['gal'])}"
+         + (", whole sachets" if p["sachets"] <= 10 else ", weighed")),
         ("Nutrients", f"{product_name(r.get('product'))} × "
                       f"{r.get('additions')}, {r.get('demand')} demand", None),
     ])
     scale_form = f"""<form class="inline" method="get" action="/recipes/{esc(r['slug'])}/must">
-<div class="grid"><span>{field("gal", "How much are you making? (gal)", num(p['gal']), "Your carboys: 5, 6, 6.8.")}</span></div>
+<div class="grid"><span>{field("gal", "How much are you making?", req.params.get("gal") or f"{num(p['gal'])} gal", "Gallons, BBL or liters: 6, 6.8 gal, 3 bbl, 350 L. A BBL is 31 gal.", typ="text")}</span></div>
 <button>Make must</button>
 <button class="quiet" formaction="/recipes/{esc(r['slug'])}">Just show the sheet</button></form>"""
     notes = details("Notes", f'<div class="inner">{esc(r["notes"])}</div>') \
@@ -233,7 +250,7 @@ def recipe(req):
     body = (card(identity)
             + next_link(f"/design?recipe={r['slug']}", "Redesign")
             + scale_form
-            + render_sheet(p, f"At {num(p['gal'])} gal you'll need")
+            + render_sheet(p, f"At {calc.vol_text(p['gal'])} you'll need")
             + notes + batch_block + version_block
             + f'<p class="mut">Updated {esc(r.get("updated") or "—")}, '
               f'v{r.get("version", 1)}. '
