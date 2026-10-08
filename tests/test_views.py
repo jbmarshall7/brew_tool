@@ -54,7 +54,7 @@ class DesignPageTest(unittest.TestCase):
         r = get("/design", {"gal": "abc", "abv": "14"})
         self.assertEqual(r.status, 200)
         self.assertIn('class="msg err"', r.body)
-        self.assertIn("isn&#x27;t a number", r.body)
+        self.assertIn("isn&#x27;t something I can read", r.body)
         self.assertIn('name="gal"', r.body)
         self.assertIn('value="abc"', r.body)      # what they typed survives
         self.assertNotIn("you&#x27;ll need", r.body)

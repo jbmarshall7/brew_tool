@@ -102,7 +102,7 @@ def targets_card(inp, p=None, store=None):
 </div></div>""", open_=more_open or fruit_on)
     return f"""<div class="card">
 <h2>Targets</h2>
-{field("gal", "Batch volume (gal)", inp["gal"], "Your carboys: 5, 6, 6.8.")}
+{field("gal", "Batch volume", inp["gal"], "Gallons, BBL or liters: 6, 6.8 gal, 3 bbl, 350 L. A BBL is 31 gal.", typ="text")}
 {field("abv", "Target strength (% ABV)", inp["abv"], abv_hint)}
 {tag_radios("yeast", "Yeast", [(y, y) for y in strains], known,
             "The strain sets the tolerance warning. Grams are worked out "
@@ -161,9 +161,9 @@ def render(params, store=None, msg=None, kind="ok"):
     right = ""
     if p:
         left += save_card(store, editing, params)
-        right = render_sheet(p, f"At {num(p['gal'])} gal you'll need")
+        right = render_sheet(p, f"At {calc.vol_text(p['gal'])} you'll need")
         right += next_link(must_href(editing, p) if editing else "/recipes",
-                           f"Make must at {num(p['gal'])} gal"
+                           f"Make must at {calc.vol_text(p['gal'])}"
                            if editing else "Every recipe you've kept")
     body = (f'<form method="get" action="/design" id="targets">{keep}'
             f'<div class="cols"><div class="stack">{left}</div>'

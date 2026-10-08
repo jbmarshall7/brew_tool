@@ -12,6 +12,7 @@ community-standard TOSNA figures. The second block is brew_tool's own
 planning figures, each with its source. All of them are approximations for
 a small meadery: the hydrometer has the last word.
 """
+import re
 from datetime import datetime, timedelta
 
 # --- from mead_calc.py, verbatim -------------------------------------------
@@ -147,6 +148,57 @@ def num(value, what, lo=None, hi=None, unit=""):
 
 def blank(value):
     return value is None or str(value).strip() == ""
+
+
+# --- volumes, typed any way a cellar says them -------------------------------
+# A one-gallon test, a 6-gallon carboy, a bucket, or the 3 BBL conical: the
+# same box takes all of them. A BBL here is a brewer's barrel, 31 US gallons
+# (the unit a conical is sold in) — not a wine barrel.
+GAL_PER_BBL = 31.0
+_VOLUME = re.compile(
+    r"^\s*(\d+(?:[.,]\d+)?)\s*(gal(?:lon)?s?|bbls?|barrels?|l|lit(?:er|re)s?)?"
+    r"\.?\s*$", re.I)
+
+
+def parse_volume(text, what="volume", lo=0.1, hi=1000):
+    """US gallons from what was typed: 6 · 6.8 gal · 3 bbl · 1 barrel ·
+    350 L · 6,5 — or a ValueError in plain words. Bare numbers are gallons."""
+    if isinstance(text, (int, float)):
+        g = float(text)
+    else:
+        m = _VOLUME.match(str(text or ""))
+        if not m:
+            raise ValueError(f"{what.capitalize()} '{text}' isn't something I "
+                             "can read — try 6, 6.8 gal, 3 bbl or 350 L")
+        raw, unit = m.group(1), (m.group(2) or "gal").lower()
+        qty = float(raw.replace(",", "") if re.fullmatch(r"\d{1,3},\d{3}", raw)
+                    else raw.replace(",", "."))
+        if unit.startswith("b"):
+            g = qty * GAL_PER_BBL
+        elif unit.startswith("l"):
+            g = qty * 0.264172
+        else:
+            g = qty
+    if g != g or g < lo:
+        raise ValueError(f"{what} {text} is below {num_(lo)} gal")
+    if g > hi:
+        raise ValueError(f"{what} {text} is {num_(g)} gal — above the "
+                         f"{num_(hi)} gal ({num_(hi / GAL_PER_BBL, 1)} BBL) "
+                         "this plans for")
+    return round(g, 3)
+
+
+def vol_text(gal):
+    """'6 gal' — or '93 gal (3 BBL)' once it is brewhouse-sized."""
+    g = f"{num_(gal)} gal"
+    if gal >= GAL_PER_BBL:
+        return f"{g} ({num_(gal / GAL_PER_BBL)} BBL)"
+    return g
+
+
+def ml_text(ml):
+    """'124 mL', or '2.4 L' once a jug beats a measuring cup."""
+    return f"{num_(ml / 1000, 1)} L" if ml >= 1000 else f"{round(ml)} mL"
 
 
 # --- gravity and alcohol ----------------------------------------------------
@@ -621,7 +673,7 @@ def plan(gal, abv_target=None, og=None, fg=1.0, strain="71B",
     and the other is derived. Yeast is whole sachets from the volume and the
     OG (see yeast_for). Raises ValueError in a cellar voice on nonsense.
     """
-    gal = num(gal, "batch volume", 0.1, 1000, " gal")
+    gal = parse_volume(gal, "batch volume")
     fg = 1.0 if blank(fg) else num(fg, "finish FG", 0.950, 1.100)
     if not blank(og):
         og = num(og, "OG", 1.000, 1.250)

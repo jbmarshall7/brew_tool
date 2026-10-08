@@ -61,12 +61,15 @@ def rows(p):
          f"they come to ~{num(p['gal'] + p.get('overfill_gal', 0))} gal on "
          "their own"),
         ("Yeast", value(f"{num(p['yeast_g'], 1)} g {p['strain']}",
-                        f"({p['sachets']} sachet{'s' if p['sachets'] != 1 else ''})"),
+                        f"({p['sachets']} sachet{'s' if p['sachets'] != 1 else ''})"
+                        if p["sachets"] <= 10 else
+                        "(weigh it from a 500 g brick)"),
          f"{num(p['yeast_rate'], 1)} g per gal"
          + (f" above {calc.HIGH_OG_PITCH_SG:.3f}" if p["high_og_pitch"] else "")
          + f" = {num(p['yeast_by_rule'], 1)} g, to the nearest "
-         f"{num(calc.YEAST_PACKET_G)} g sachet"),
-        ("Go-Ferm", f"{num(p['goferm_g'], 1)} g in {p['goferm_water_ml']} mL "
+         f"{num(calc.YEAST_PACKET_G)} g"
+         + (" sachet" if p["sachets"] <= 10 else "")),
+        ("Go-Ferm", f"{num(p['goferm_g'], 1)} g in {calc.ml_text(p['goferm_water_ml'])} "
                     f"water at {calc.REHYDRATE_F} °F",
          f"{calc.GOFERM_G_PER_G_YEAST} g per g of yeast; "
          f"{num(calc.GOFERM_WATER_ML_PER_G)} mL per g Go-Ferm. Twenty minutes, "

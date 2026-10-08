@@ -89,7 +89,7 @@ def steps(p, og=None, gal=None):
         ("Read it", "hydrometer and pH",
          "Before the yeast goes in — the form below does the arithmetic."),
         ("Rehydrate and pitch",
-         f"{p['goferm_water_ml']} mL water at {calc.REHYDRATE_F} °F, "
+         f"{calc.ml_text(p['goferm_water_ml'])} water at {calc.REHYDRATE_F} °F, "
          f"{num(p['goferm_g'], 1)} g Go-Ferm, {num(p['yeast_g'], 1)} g "
          f"{p['strain']}",
          "Stir the Go-Ferm in, sprinkle the yeast on, wait 15–20 minutes. "
@@ -111,8 +111,7 @@ def steps(p, og=None, gal=None):
 def now_gal_from(p, params):
     if calc.blank(params.get("now_gal")):
         return p["gal"]
-    return calc.num(params.get("now_gal"), "volume in the carboy", 0.1, 1000,
-                    " gal")
+    return calc.parse_volume(params.get("now_gal"), "volume in the carboy")
 
 
 def check(p, params):
@@ -209,8 +208,8 @@ def read_form(slug, p, params, checked, correction=None, verdict=None,
     # bound to the check's form by id: it sits outside the <form> for layout,
     # and without form="read" a check never sent it (so a water top-up was
     # silently ignored by everything downstream)
-    now_box = field("now_gal", "Volume in the carboy now (gal)", now_gal,
-                    now_hint, attrs='form="read"')
+    now_box = field("now_gal", "Volume in the carboy now", now_gal,
+                    now_hint, typ="text", attrs='form="read"')
     inner = (f'<h3>Read it — before the yeast goes in</h3>'
              f'<form class="row" method="get" '
              f'action="/recipes/{esc(slug)}/must" id="read">'
@@ -240,7 +239,7 @@ def record_form(slug, p, params, og, next_id, gal_now, now=None):
 <span>{field("pitched_at", "Yeast pitched at", g("pitched_at", now), "The feeding clock starts here.", typ="datetime-local", step=None, required=True, id_="rec-pitched")}</span>
 <span>{field("og", "OG (corrected)", og_val, (f"The honey reading plus the fruit's ~{num(fruit_pts(p), 1)} points — what the feeds are sized from." if fruit_pts(p) else "From the check above, or type it."), step="0.0001", required=True, id_="rec-og")}</span>
 <span>{field("ph", "pH", g("ph"), "Optional.", step="0.01", id_="rec-ph")}</span>
-<span>{field("volume_gal", "In the carboy now (gal)", g("volume_gal", num(gal_now)), "After any water you added — the feedings are sized from it.", id_="rec-volume")}</span>
+<span>{field("volume_gal", "In the carboy now", g("volume_gal", num(gal_now)), "After any water you added — the feedings are sized from it. Gallons, or 3 bbl.", typ="text", id_="rec-volume")}</span>
 <span>{field("honey_lb", "Honey in (lb)", g("honey_lb", num(p["honey_lb"])), "What the scale said, including anything stirred in after the check.", id_="rec-honey")}</span>
 <span>{field("water_gal", "Water in (gal)", g("water_gal", num(p["water_gal"])), "Blank is fine if it was all honey and top-up.", id_="rec-water")}</span>
 <span>{field("yeast_g", "Yeast (g)", g("yeast_g", num(p["yeast_g"], 1)), None, id_="rec-yeast")}</span>
@@ -257,7 +256,7 @@ def must_page(req, params, msg=None, kind="ok"):
     r = store.load_recipe(req.args[0])
     last = store.last_batch(r["slug"])
     gal_text = params.get("gal") or num(r.get("design_gal"))
-    gal = calc.num(gal_text, "volume", 0.1, 1000, " gal")
+    gal = calc.parse_volume(gal_text, "volume")
     p = plan_for(r, gal)
     if calc.blank(params.get("cal_f")) and last and \
             (last.get("measured") or {}).get("cal_f"):
@@ -275,7 +274,7 @@ def must_page(req, params, msg=None, kind="ok"):
         last_line = (f"last time {last['id']} came in at "
                      f"{sg(last['measured']['og'])}")
     strip = kv([
-        ("Making", f"{num(p['gal'])} gal of {r['name']}",
+        ("Making", f"{calc.vol_text(p['gal'])} of {r['name']}",
          f"target OG {sg(p['og'])} · {num(p['abv_if_dry'], 1)} % if dry · "
          f"{num(p['yeast_g'], 1)} g {p['strain']} · "
          f"{product_name(p['product'])} × {p['additions']}"
@@ -292,7 +291,7 @@ def must_page(req, params, msg=None, kind="ok"):
     rec = record_form(r["slug"], p, params, og, next_id, gal_now)
     # the whole of must day in one card: what you do, then the reading that
     # tells you whether it worked
-    tag = pill("{} gal · next id {}".format(num(p["gal"]), next_id), "ok")
+    tag = pill("{} · next id {}".format(calc.vol_text(p["gal"]), next_id), "ok")
     must_card = (
         '<div class="card">'
         '<div class="sheet-head"><h2>Must day, in floor order</h2>'
@@ -347,8 +346,7 @@ def record(req):
                         text, "err")
 
     try:
-        gal = calc.num(f.get("gal") or r.get("design_gal"), "volume", 0.1,
-                       1000)
+        gal = calc.parse_volume(f.get("gal") or r.get("design_gal"), "volume")
         p = plan_for(r, gal)
         pitched = calc.parse_when(f.get("pitched_at"))
         if pitched > datetime.now() + FUTURE_SLACK:
@@ -364,8 +362,7 @@ def record(req):
             return bounce(f"{batch_id} is already recorded, so this must is "
                           f"offered the next number, {nxt}. Check the id and "
                           "tap Record again.", drop_id=True)
-        volume = calc.num(f.get("volume_gal"), "volume in the carboy", 0.1,
-                          1000, " gal")
+        volume = calc.parse_volume(f.get("volume_gal"), "volume in the carboy")
         og = calc.num(f.get("og"), "OG", 0.950, 1.250)
         fg = p["fg"]
         ph = (None if calc.blank(f.get("ph"))

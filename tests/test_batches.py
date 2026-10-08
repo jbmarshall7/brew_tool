@@ -216,7 +216,8 @@ class PagesTest(BatchTestCase):
         self.assertIn('name="id" type="text" value="B-2027-001"', r.body)
         # the recipe page's Make-must form starts from last time's volume
         r = self.get("/recipes/orange-blossom-traditional")
-        self.assertIn('name="gal" type="number" value="6.5"', r.body)
+        # a text box now (it takes 3 bbl too), prefilled from the last batch
+        self.assertIn('name="gal" type="text" value="6.5 gal"', r.body)
 
     def test_record_form_follows_the_check(self):
         r = self.get(MUST, {"gal": "6", "reading": "1.101", "temp_f": "76",
@@ -264,12 +265,12 @@ class PagesTest(BatchTestCase):
         body = self.get(MUST, {"gal": "6", "reading": "1.112",
                                "temp_f": "60"}).body
         self.assertIn("put 6.3 in &#x27;volume now&#x27;", body)
-        self.assertIn('name="now_gal" type="number" value="6"', body)
+        self.assertIn('name="now_gal" type="text" value="6"', body)
         # after the top-up the owner says what's in the carboy now
         body = self.get(MUST, {"gal": "6", "now_gal": "6.3", "reading": "1.107",
                                "temp_f": "60"}).body
         self.assertIn("On target", body)
-        self.assertIn('name="volume_gal" type="number" value="6.3"', body)
+        self.assertIn('name="volume_gal" type="text" value="6.3"', body)
         self.assertIn("at 6.3 gal", body)              # the feed step's sizing
 
 

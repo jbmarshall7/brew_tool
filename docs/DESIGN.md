@@ -6,6 +6,22 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-10-08 — scale to any size, typed (the owner's ask).** Short term the
+  cellar runs carboys and buckets; there is also an unused 3 BBL conical. So
+  every place a size is typed — the recipe page, must day, Design, racking,
+  and a vessel's capacity — is now one text box that reads it the way a cellar
+  says it: `6`, `6.8 gal`, `7.9` for a bucket, `3 bbl`, `350 L` (`parse_volume`;
+  a BBL is a brewer's barrel, 31 US gal; bare numbers are gallons; anything
+  else is refused in plain words, and what was typed stays in the box). The
+  owner asked for typing over the size buttons first proposed. The Recipes page
+  gets one "Make them at" box: type a size once and every Make button and
+  recipe link follows it — the imported award recipes were published at 1, 5,
+  5.5, 7 and 10 gal, so the old per-recipe buttons never landed on a carboy.
+  Sizes read as "93 gal (3 BBL)" from a barrel up (`vol_text`); at that scale
+  the sheet weighs yeast "from a 500 g brick" instead of counting 19 sachets,
+  and Go-Ferm water reads in litres (`ml_text`). Everything is still stored
+  and computed in gallons; the ceiling stays 1000 gal (~32 BBL).
+
 - **2026-10-08 — must-day numbers you can trust (round 13, from the
   evaluation's "fix next" list).** Wrong numbers and misleading sentences,
   taken ahead of the eight-batch usability round because they mislead:
