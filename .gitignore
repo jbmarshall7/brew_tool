@@ -7,5 +7,7 @@ __pycache__/
 # the handoff zip duplicates design_handoff_brew_tool_ui/ byte for byte
 *.zip
 
-# generated TTB / operations reports (operator output, not source)
-data/reports/
+# The cellar's records — batches, recipes, vessels, permits, reports — are the
+# business's own data, not source. This repo is public: nothing under data/ is
+# ever committed. Back the folder up separately (see README, "Where things live").
+data/
