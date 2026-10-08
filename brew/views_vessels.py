@@ -25,18 +25,31 @@ def vessels(req):
             state = raw(str(pill("free", "ok")))
             holds = ""
         else:
-            b = o["batches"][0]
-            state = raw(str(pill(b["tag"], "warn"
-                                 if b["tag"] in ("Feed due", "Stalled",
-                                                 "Reads high", "Reading is old")
-                                 else "")))
-            holds = raw(f'<a href="/batches/{esc(b["id"])}">{esc(b["id"])}</a>'
-                        f'<span class="sub">{esc(b["recipe"] or "")}'
-                        + (f' · {sg(b["sg"])}' if b["sg"] is not None else "")
-                        + (f' · day {b["day"]}' if b["day"] is not None else "")
-                        + "</span>")
+            # every batch that names this vessel — two is a mistake to fix,
+            # not something to hide behind the first one
+            bs = o["batches"]
+            if len(bs) > 1:
+                state = raw(str(pill(f"{len(bs)} batches", "warn")))
+            else:
+                state = raw(str(pill(bs[0]["tag"], "warn"
+                                     if bs[0]["tag"] in ("Feed due", "Stalled",
+                                                         "Reads high",
+                                                         "Reading is old")
+                                     else "")))
+            holds = raw("".join(
+                f'<a href="/batches/{esc(b["id"])}">{esc(b["id"])}</a>'
+                f'<span class="sub">{esc(b["recipe"] or "")}'
+                + (f' · {sg(b["sg"])}' if b["sg"] is not None else "")
+                + (f' · day {b["day"]}' if b["day"] is not None else "")
+                + "</span>" for b in bs))
         rows.append([raw(f'<b>{esc(v.get("name"))}</b>'), cap, state, holds])
-    body = table(["Vessel", "Capacity", "State", "Holding"], rows,
+    clashes = [(o["vessel"].get("name"), [b["id"] for b in o["batches"]])
+               for o in occ if len(o["batches"]) > 1]
+    warn = (banner("\n".join(
+        f"{len(ids)} batches claim {name}: {', '.join(ids)} — only one can be "
+        "in it. Fix the other on its batch page." for name, ids in clashes),
+        "warn") if clashes else "")
+    body = warn + table(["Vessel", "Capacity", "State", "Holding"], rows,
                  empty="No vessels yet — add your carboys and tanks below.")
     add = f'''<form class="inline" method="post" action="/vessels/add">{once()}
 <div class="grid">

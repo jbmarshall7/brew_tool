@@ -1182,6 +1182,8 @@ def next_batch_id(existing_ids, year):
 STUCK_PTS = 1.0             # movement at or under this is not movement
 RISE_PTS = 0.5              # a rise past this is the glass, not the mead
 STALE_DAYS = 7              # after this, one gravity settles it
+CONDITION_TEST_DAYS = 14    # bottle-conditioning: open a test bottle by now
+CONDITION_TESTED_AFTER = 10  # an 'in the bottle' tasting this late settles it
 FINISHED_MARGIN = 0.004     # this close to FG and the sugar is gone
 
 
@@ -1523,12 +1525,35 @@ def next_action(batch, now=None, product="Fermaid O"):
     def ok(tag, text):
         return {"kind": "ok", "tag": tag, "text": text}
 
-    # 0 — bottled: this batch is finished, nothing more to say
+    # 0 — bottled. A bottle-conditioned mead isn't done the day it's capped:
+    # the yeast is building pressure, so it is watched until a bottle is
+    # opened and tasted ('in the bottle'). Everything else bottled is done.
     if is_bottled(batch):
         pk = batch["packaging"]
         oh = units_on_hand(batch)
         left = (f" — {oh} on hand" if oh is not None and oh != pk.get("units")
                 else "")
+        if pk.get("conditioned"):
+            capped = parse_when(pk["at"])
+            tested = any(
+                t.get("stage") == "in the bottle" and t.get("at")
+                and parse_when(t["at"]) >= capped + timedelta(
+                    days=CONDITION_TESTED_AFTER) for t in batch.get("tastings") or [])
+            if not tested:
+                days = (now - capped).days
+                test_on = capped + timedelta(days=CONDITION_TEST_DAYS)
+                if days < CONDITION_TEST_DAYS:
+                    return ok("Conditioning",
+                              f"Bottle-conditioning — day {days} of about "
+                              f"{CONDITION_TEST_DAYS}. Keep it at 65–75 °F so the "
+                              "yeast can carbonate it; open a test bottle "
+                              f"around {test_on:%a %b} {test_on.day}.")
+                return warn("Test a bottle",
+                            f"Capped {days} days ago for "
+                            f"{num_(pk.get('target_vols') or 0)} volumes — open "
+                            "one. Flat: give it another week warm. Gushing: "
+                            "chill every bottle now, it's over-carbonating. Then "
+                            "record an 'in the bottle' tasting.")
         return ok("Bottled",
                   f"Bottled {pk.get('units')} × {esc_free(pk.get('unit'))} on "
                   f"{_clock(parse_when(pk['at'])).rsplit(',', 1)[0]}{left}. Done.")
@@ -1628,8 +1653,9 @@ def next_action(batch, now=None, product="Fermaid O"):
                       f"{day_of(pitched, now)} — nothing to compare it with "
                       "yet.")
         else:
+            d = day_of(pitched, now)
             opened = (f"Pitched at {sg_text(now_sg)}, "
-                      f"{day_of(pitched, now)} days ago, and not read since.")
+                      f"{d} day{'s' if d != 1 else ''} ago, and not read since.")
         if feed is not None:
             return ok("Waiting", f"{opened} Next up: {product} #{feed['n']}, "
                       f"{_g1(feed['g'])} g {_clock(parse_when(feed['due']))}.")

@@ -198,7 +198,7 @@ def read_form(slug, p, params, checked, correction=None, verdict=None,
     row = "".join(
         f'<span style="width:{w}px">{f}</span>' for w, f in (
             (130, field("reading", "Hydrometer", params.get("reading", ""),
-                        None, step="0.001", attrs='placeholder="1.101"')),
+                        None, step="any", attrs='placeholder="1.101"')),
             (112, field("temp_f", "Sample °F", params.get("temp_f", ""),
                         None, attrs='placeholder="76"')),
             (96, field("ph", "pH", params.get("ph", ""), None, step="0.01",

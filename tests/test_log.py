@@ -503,7 +503,10 @@ class TodayTest(LogTestCase):
         self.assertEqual(r.status, 303)
         self.assertTrue(r.location.startswith("/batches/B-2026-003?msg="))
 
-    def test_batches_still_resolves(self):
+    def test_all_batches_is_a_page_of_its_own(self):
+        # Today holds what's in a tank or has bottles left; /batches is every
+        # batch ever made, finished ones included
         r = self.get("/batches")
-        self.assertEqual(r.status, 303)
-        self.assertEqual(r.location, "/")
+        self.assertEqual(r.status, 200)
+        self.assertIn('href="/batches/B-2026-003"', r.body)
+        self.assertIn("newest first", r.body)

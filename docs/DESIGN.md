@@ -6,6 +6,42 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-10-08 — usable at eight batches (round 14).** Measured on a seeded
+  8-batch cellar at phone size (375×812):
+  - **Today holds what's in a tank.** Bottled batches move to a short Bottled
+    list while they have bottles (or a conditioning check) left; sold-out ones
+    live on `/batches`, now a real page of every batch. The lede counts what
+    wants you, not everything ever made.
+  - **The commonest urgent job is one tap.** A Feed-due card carries
+    "Fed #n" (records the feeding, lands back on Today); the batch page's Next
+    bar carries "I gave #n".
+  - **A bottle-conditioned mead isn't "Done." the day it's capped.** It reads
+    "Conditioning — day n" until ~14 days, then warns "Test a bottle" (flat:
+    another week warm; gushing: chill everything now) until an 'in the bottle'
+    tasting is recorded.
+  - **The batch page shows the next step first.** The button under the Next
+    sentence goes where the sentence points (Rack it, Stabilize it, Bottle it,
+    Where the bottles went, Record the tasting — from `NEXT_STEP`, keyed on the
+    sentence's own tag, so they can't disagree); only that finishing step is
+    open, done steps show their summary, the rest fold one tap away; the log
+    folds outside fermentation; the must-day facts and feed schedule fold once
+    fermentation is behind it. A preview you just asked for (pH typed, priming
+    shown) opens where you are. The Ready-to-stabilize page went from 8.9
+    phone-screens with 9 open forms to 3.6 with none in the way.
+  - **Vessels:** every batch naming a vessel is listed, and two claiming one
+    is flagged; the batch page picks its vessel from your list (free text only
+    until there is one), so a typo can't strand a batch on no vessel.
+  - **Refused forms keep what was typed** (sale, tasting, flavor, rack,
+    bottle — and stabilize/prime/sweeten come back with their preview), carried
+    as `k_<field>` so a field called `kind` can't collide with the banner's
+    `kind=err` (a test caught exactly that). Gravity boxes take a fourth
+    decimal, priming takes 2.25 volumes, the tasting score stops at 5, every
+    form field has its own id, and a refused redesign keeps its changelog.
+  - Found in the browser, not by the first tests: the Feed-due card's form sat
+    inside a `<p>`, which browsers close before a `<form>` — the button fell
+    out of the card. The footer is a div now, and a test fails if any form is
+    nested in a paragraph; every page was scanned clean.
+
 - **2026-10-08 — scale to any size, typed (the owner's ask).** Short term the
   cellar runs carboys and buckets; there is also an unused 3 BBL conical. So
   every place a size is typed — the recipe page, must day, Design, racking,

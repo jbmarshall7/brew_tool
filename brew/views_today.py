@@ -41,16 +41,32 @@ def look_at(store, now):
     return out
 
 
-def attention_card(b, act):
+def fed_button(b, now):
+    """'Fed #2' on a Feed-due card: records the feeding and comes back to
+    Today, so the commonest urgent job is one tap, not a page load."""
+    nf, _ = calc.next_feed(b, now)
+    if not nf:
+        return ""
+    return (f'<form class="mini noprint" method="post" '
+            f'action="/batches/{esc(b["id"])}/feed">{once()}'
+            f'{hidden("n", str(nf["n"]))}{hidden("back", "today")}'
+            f'<button>Fed #{nf["n"]}</button></form>')
+
+
+def attention_card(b, act, now=None):
     r = b.get("recipe") or {}
     now_sg = calc.current_sg(b)
+    fed = (fed_button(b, now or datetime.now())
+           if act["tag"] == "Feed due" else "")
     return (f'<div class="attn">'
             f'<span class="kick">{esc(act["tag"])}</span>'
             f'<h3>{esc(r.get("name") or b["id"])} · '
             f'{esc(sg(now_sg) if now_sg is not None else "—")}</h3>'
             f'<p>{esc(act["text"])}</p>'
-            f'<p class="foot"><a class="btn" href="/batches/{esc(b["id"])}">'
-            f'Open the batch</a> <span class="mut">{esc(b["id"])}</span></p>'
+            # a div, not a p: a browser closes a <p> before any <form>,
+            # which threw the Fed button out of the card's footer
+            f'<div class="foot">{fed}<a class="btn" href="/batches/{esc(b["id"])}">'
+            f'Open the batch</a> <span class="mut">{esc(b["id"])}</span></div>'
             "</div>")
 
 
@@ -67,7 +83,7 @@ def gravity_note(b, now):
 
 def row_log(batch_id):
     """A gravity field on the row itself: the daily job at one page load."""
-    box = field("reading", "", "", None, step="0.001", required=True,
+    box = field("reading", "", "", None, step="any", required=True,
                 attrs='placeholder="1.0__"', id_=f"sg-{batch_id}")
     return (f'<form class="mini noprint" method="post" '
             f'action="/batches/{esc(batch_id)}/reading">{once()}{box}'
@@ -108,6 +124,23 @@ def cellar_row(b, act, now):
     ]
 
 
+def bottled_rows(pairs):
+    rows = []
+    for b, act in pairs:
+        pk = b.get("packaging") or {}
+        r = b.get("recipe") or {}
+        rows.append([
+            raw(f'<a href="/batches/{esc(b["id"])}">{esc(b["id"])}</a>'
+                f'<span class="sub">{esc(r.get("name") or "")}</span>'),
+            f"{(pk.get('at') or '')[:10]} · {pk.get('units')} × "
+            f"{pk.get('unit')}",
+            str(calc.units_on_hand(b)),
+            raw(f'{pill(act["tag"], act["kind"])}'
+                f'<span class="sub">{esc(act["text"])}</span>'),
+        ])
+    return rows
+
+
 def documents_alert(store, now):
     """The compliance banner Today shares with the Documents page, or ''."""
     from .views_documents import banner_for
@@ -136,23 +169,36 @@ def today(req):
         return Response(_page(title, body, "/", req.params.get("msg"),
                               req.params.get("kind", "ok")))
     wants = [(b, a) for b, a in pairs if a["kind"] == "warn"]
-    going = len(pairs)
+    # the cellar is what is still in a tank; a bottled batch moves to its own
+    # short list while it has bottles (or a conditioning check) left
+    active = [(b, a) for b, a in pairs if not calc.is_bottled(b)]
+    bottled = [(b, a) for b, a in pairs if calc.is_bottled(b)
+               and (a["kind"] == "warn" or a["tag"] == "Conditioning"
+                    or (calc.units_on_hand(b) or 0) > 0)]
+    going = len(active)
     lede = ("Nothing wants you today — it is all just fermenting quietly."
             if not wants else
-            f"{len(wants)} of your {going} batch"
-            f"{'es' if going != 1 else ''} want{'s' if len(wants) == 1 else ''}"
-            " you today. The rest is just fermenting quietly.")
+            f"{len(wants)} batch{'es' if len(wants) != 1 else ''} "
+            f"want{'s' if len(wants) == 1 else ''} you today. "
+            + ("The rest is just fermenting quietly." if going else ""))
     body = docs
     if wants:
         body += ("<h2>Needs you now</h2><div class=\"attns\">"
-                 + "".join(attention_card(b, a) for b, a in wants) + "</div>")
-    body += ('<div class="sheet-head"><h2>In the cellar</h2>'
-             '<span class="mut">type a gravity on any row — the app does '
-             "the rest</span></div>"
-             + '<div class="cellar">'
-             + table(["Batch", "Day", "Gravity", "Trend", "Next thing",
-                      "Log a reading"], cellar_rows(pairs, now))
-             + "</div>"
+                 + "".join(attention_card(b, a, now) for b, a in wants)
+                 + "</div>")
+    if active:
+        body += ('<div class="sheet-head"><h2>In the cellar</h2>'
+                 '<span class="mut">type a gravity on any row — the app does '
+                 "the rest</span></div>"
+                 + '<div class="cellar">'
+                 + table(["Batch", "Day", "Gravity", "Trend", "Next thing",
+                          "Log a reading"], cellar_rows(active, now))
+                 + "</div>")
+    if bottled:
+        body += ("<h2>Bottled</h2>"
+                 + table(["Batch", "Bottled", "On hand", "Now"],
+                         bottled_rows(bottled)))
+    body += (next_link("/batches", "All batches, finished ones too")
              + '<p class="mut">Nothing here is a status you have to keep up '
                "to date — every line is derived from the readings, the "
                "feedings you logged and the pitch date.</p>")
