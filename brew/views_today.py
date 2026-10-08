@@ -63,8 +63,10 @@ def attention_card(b, act, now=None):
             f'<h3>{esc(r.get("name") or b["id"])} · '
             f'{esc(sg(now_sg) if now_sg is not None else "—")}</h3>'
             f'<p>{esc(act["text"])}</p>'
-            f'<p class="foot">{fed}<a class="btn" href="/batches/{esc(b["id"])}">'
-            f'Open the batch</a> <span class="mut">{esc(b["id"])}</span></p>'
+            # a div, not a p: a browser closes a <p> before any <form>,
+            # which threw the Fed button out of the card's footer
+            f'<div class="foot">{fed}<a class="btn" href="/batches/{esc(b["id"])}">'
+            f'Open the batch</a> <span class="mut">{esc(b["id"])}</span></div>'
             "</div>")
 
 
@@ -81,7 +83,7 @@ def gravity_note(b, now):
 
 def row_log(batch_id):
     """A gravity field on the row itself: the daily job at one page load."""
-    box = field("reading", "", "", None, step="0.001", required=True,
+    box = field("reading", "", "", None, step="any", required=True,
                 attrs='placeholder="1.0__"', id_=f"sg-{batch_id}")
     return (f'<form class="mini noprint" method="post" '
             f'action="/batches/{esc(batch_id)}/reading">{once()}{box}'

@@ -244,7 +244,7 @@ form.mini button { margin-top:0; min-height:38px; padding:0 14px;
               color:var(--accent-700); }
 .attn h3 { font-size:19px; margin:6px 0 8px; }
 .attn p { margin:0; font-size:13.5px; line-height:1.5; opacity:.78; }
-.attn p.foot { margin-top:14px; display:flex; align-items:center; gap:12px;
+.attn .foot { margin-top:14px; display:flex; align-items:center; gap:12px;
                flex-wrap:wrap; }
 .attn .mut { font-size:11.5px; }
 

@@ -1653,8 +1653,9 @@ def next_action(batch, now=None, product="Fermaid O"):
                       f"{day_of(pitched, now)} — nothing to compare it with "
                       "yet.")
         else:
+            d = day_of(pitched, now)
             opened = (f"Pitched at {sg_text(now_sg)}, "
-                      f"{day_of(pitched, now)} days ago, and not read since.")
+                      f"{d} day{'s' if d != 1 else ''} ago, and not read since.")
         if feed is not None:
             return ok("Waiting", f"{opened} Next up: {product} #{feed['n']}, "
                       f"{_g1(feed['g'])} g {_clock(parse_when(feed['due']))}.")

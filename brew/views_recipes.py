@@ -91,7 +91,9 @@ def keep_design(form):
     """The Design page query that reproduces what the owner had typed."""
     keep = {k: form.get(k, "") for k in DEFAULTS}
     keep.update({"name": form.get("name", ""), "honey": form.get("honey", ""),
-                 "notes": form.get("notes", "")})
+                 "notes": form.get("notes", ""),
+                 # a refused redesign keeps its "what changed" line too
+                 "changelog": form.get("changelog", "")})
     if form.get("from_slug"):
         keep["recipe"] = form["from_slug"]
     return "/design?" + urlencode(keep)
