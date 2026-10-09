@@ -17,7 +17,7 @@ from .html import (banner, card, details, esc, field, gal_l, hidden, kv,
 from .server import Response, redirect, route
 from .store import FUTURE_SLACK, AlreadyRecorded
 from .sheet import feed_when, product_name
-from .views_recipes import plan_for
+from .views_recipes import notes_block, plan_for
 
 DEFAULT_CAL_F = calc.DEFAULT_CAL_F
 RECORD_FIELDS = ("id", "pitched_at", "volume_gal", "honey_lb", "water_gal",
@@ -27,14 +27,56 @@ CHECK_FIELDS = ("gal", "now_gal", "reading", "temp_f", "cal_f", "ph")
 LOOSE_ID = re.compile(r"(?:B-(\d{4})-)?(\d{1,3})", re.IGNORECASE)
 
 
-def fruit_pts(p):
-    """Points whole fruit will add once it gives up its sugar — none of which
-    a hydrometer sees on must day. Juice, cider and purée are already in
-    solution, so the reading includes them: nothing to add back."""
+# Above this a honey-and-water reading is off a mead hydrometer and thicker
+# than anything is pitched into: the honey goes onto the fruit instead.
+HONEY_WATER_MAX = 1.200
+
+
+def whole_fruit(p):
+    """How must day reads a melomel on whole fruit — or None for no fruit, or
+    juice, cider and purée, which are already dissolved (the reading counts
+    them).
+
+    The plan puts the fruit's volume inside the batch, so on must day the
+    honey sits in the honey and water alone. Read that before the fruit goes
+    in ("before"): the target is the honey's points over that smaller volume.
+    (It used to be the batch OG less the fruit's points — the honey spread
+    over the fruit's room as well, which no hydrometer sees. A cherry mead
+    read 60 points over that and was told to add three gallons of water.)
+    The fruit's juice then blends the must to the OG over the next days.
+    With little or no water ("mixed") the honey goes straight onto the fruit
+    and today's reading depends on how much juice has come out, so there is
+    no target to hold it to: the plan's OG is what's recorded."""
     fr = p.get("fruit") or {}
     if not fr or calc.fruit_in_solution(fr.get("item")):
-        return 0.0
-    return fr.get("points") or 0.0
+        return None
+    liquid = round(p["honey_gal"] + p["water_gal"], 2)
+    honey = p["honey_lb"] * p["constants"]["PPG_PER_LB_HONEY"]
+    target = round(1.0 + honey / liquid / 1000.0, 4)
+    mode = ("before" if p["water_gal"] > 0 and target <= HONEY_WATER_MAX
+            else "mixed")
+    return {"mode": mode, "liquid_gal": liquid, "target": target,
+            "fruit_gal": fr["gal"],
+            "fruit_ptsgal": fr["lb"] * fr["sugar_pct"] / 100.0 * calc.SUGAR_PPG}
+
+
+def reads_before_fruit(p):
+    wf = whole_fruit(p)
+    return wf if wf and wf["mode"] == "before" else None
+
+
+def blended_og(wf, reading, liquid_gal):
+    """The must's OG once the fruit has given up its juice, from a honey-and-
+    water reading at `liquid_gal`."""
+    pts = calc.points(reading) * liquid_gal + wf["fruit_ptsgal"]
+    return round(1.0 + pts / (liquid_gal + wf["fruit_gal"]) / 1000.0, 4)
+
+
+def must_volume(p, gal_now):
+    """The whole must — honey, water and fruit — that the feeds are sized
+    from. Before the fruit goes in, the box holds honey and water only."""
+    wf = reads_before_fruit(p)
+    return round(gal_now + wf["fruit_gal"], 2) if wf else gal_now
 
 
 def feeds(p, og=None, gal=None):
@@ -61,33 +103,56 @@ def steps(p, og=None, gal=None):
             5: "five cups", 6: "six cups"}.get(n, f"{n} cups")
     when = feed_when(n, sg(fd["stop"]))
     fr = p.get("fruit")
+    wf = whole_fruit(p)
     room = (f"The honey takes {num(p['honey_gal'])} gal and the fruit about "
             f"{num(fr['gal'])}." if fr else
             f"The honey takes the other {num(p['honey_gal'])} gal.")
-    items = [
-        ("Honey", lb_oz(p["honey_lb"]),
-         "Don't boil it — a warm water bath if it's slow to pour."),
-    ]
-    if fr and calc.fruit_in_solution(fr["item"]):
-        items.append((
-            "Fruit", f"{lb_oz(fr['lb'])} {fr['item']} (~{gal_l(fr['gal'])})",
-            "Pour it in with the honey. Its sugar is already dissolved, so the "
-            "hydrometer reads it today — the check below counts it."))
-    elif fr:
-        items.append((
-            "Fruit", f"{lb_oz(fr['lb'])} {fr['item']}",
-            "In a mesh bag — crushed, or frozen and thawed so it gives up its "
-            "juice. Its sugar comes out over the next days, so today's "
-            "hydrometer reads the honey only; the check below expects that."))
+    honey = ("Honey", lb_oz(p["honey_lb"]),
+             "Don't boil it — a warm water bath if it's slow to pour.")
+    read = ("Read it", "hydrometer and pH",
+            "Before the yeast goes in — the form below does the arithmetic.")
+    if wf and wf["mode"] == "before":
+        # floor order: the honey and water are read before the fruit hides
+        # them, then the fruit brings the must up to the mark
+        items = [
+            honey,
+            ("Water", f"start with {gal_l(p['water_gal'])}",
+             f"{room} Stir until it is one liquid — about "
+             f"{num(wf['liquid_gal'])} gal of honey and water. Read it now: "
+             f"the fruit goes in after and brings it to the {num(p['gal'])} "
+             "gal mark."),
+            ("Read it", "hydrometer and pH",
+             "Honey and water only, before the fruit and the yeast — the form "
+             "below does the arithmetic."),
+            ("Fruit", f"{lb_oz(fr['lb'])} {fr['item']}",
+             "After the reading, in a mesh bag — crushed, or frozen and thawed "
+             "so it gives up its juice. Over the next days its juice and sugar "
+             f"take the must to about OG {sg(p['og'])}."),
+        ]
+    else:
+        items = [honey]
+        if fr and calc.fruit_in_solution(fr["item"]):
+            items.append((
+                "Fruit", f"{lb_oz(fr['lb'])} {fr['item']} (~{gal_l(fr['gal'])})",
+                "Pour it in with the honey. Its sugar is already dissolved, so "
+                "the hydrometer reads it today — the check below counts it."))
+        elif fr:
+            items.append((
+                "Fruit", f"{lb_oz(fr['lb'])} {fr['item']}",
+                "Crushed, or frozen and thawed so it gives up its juice. With "
+                "next to no water the honey goes straight onto it — stir it "
+                "through. Today's reading depends on how much juice has come "
+                "out, so the check below has no target for it."))
+        items += [
+            ("Water", (f"start with {gal_l(p['water_gal'])}"
+                       if p["water_gal"] > 0 else "none"),
+             (f"{room} Stir until it is one liquid, then top to the "
+              f"{num(p['gal'])} gal mark." if p["water_gal"] > 0 else
+              f"{room} Together they fill the {num(p['gal'])} gal — add no "
+              "water.")),
+            read,
+        ]
     items += [
-        ("Water", (f"start with {gal_l(p['water_gal'])}"
-                   if p["water_gal"] > 0 else "none"),
-         (f"{room} Stir until it is one liquid, then top to the "
-          f"{num(p['gal'])} gal mark." if p["water_gal"] > 0 else
-          f"{room} Together they fill the {num(p['gal'])} gal — add no "
-          "water.")),
-        ("Read it", "hydrometer and pH",
-         "Before the yeast goes in — the form below does the arithmetic."),
         ("Rehydrate and pitch",
          f"{calc.ml_text(p['goferm_water_ml'])} water at {calc.REHYDRATE_F} °F, "
          f"{num(p['goferm_g'], 1)} g Go-Ferm, {num(p['yeast_g'], 1)} g "
@@ -109,13 +174,18 @@ def steps(p, og=None, gal=None):
 
 
 def now_gal_from(p, params):
+    """The 'volume now' box: honey and water only while the fruit waits."""
     if calc.blank(params.get("now_gal")):
-        return p["gal"]
+        wf = reads_before_fruit(p)
+        return wf["liquid_gal"] if wf else p["gal"]
     return calc.parse_volume(params.get("now_gal"), "volume in the carboy")
 
 
 def check(p, params):
-    """(banner_text, kind, corrected_og, correction) or (None, None, None, None)."""
+    """(banner_text, kind, corrected_og, correction) or (None, None, None, None).
+
+    The OG handed back is the must's, for the record and the feeds: a
+    honey-and-water reading comes back blended with the fruit to come."""
     if calc.blank(params.get("reading")) and calc.blank(params.get("ph")):
         return None, None, None, None
     lines, kind, og, c = [], "ok", None, None
@@ -123,32 +193,48 @@ def check(p, params):
              else calc.num(params.get("cal_f"), "hydrometer calibration", 32,
                            110, " °F"))
     gal_now = now_gal_from(p, params)
+    wf = whole_fruit(p)
+    before = wf if wf and wf["mode"] == "before" else None
     if not calc.blank(params.get("reading")):
         reading = calc.num(params.get("reading"), "hydrometer reading", 0.950,
                            1.250)
+        what = ("Honey and water" if before else
+                "Today's reading" if wf else "OG")
         if calc.blank(params.get("temp_f")):
             og = reading
-            lines.append(f"OG {sg(og)} (as read — no sample temperature, so "
-                         "no correction).")
+            lines.append(f"{what} {sg(og)} (as read — no sample temperature, "
+                         "so no correction).")
         else:
             temp_f = calc.num(params.get("temp_f"), "sample temperature", 32,
                               140, " °F")
             og = calc.hydro_correct(reading, temp_f, cal_f)
-            lines.append(f"OG {sg(og)} (read {sg(reading)} at {num(temp_f)} "
-                         f"°F, hydrometer {num(cal_f)} °F).")
-        fp = fruit_pts(p)
-        honey_target = round(p["og"] - fp / 1000.0, 4)
-        c = calc.correction(og, honey_target, gal_now, p["fg"],
+            lines.append(f"{what} {sg(og)} (read {sg(reading)} at "
+                         f"{num(temp_f)} °F, hydrometer {num(cal_f)} °F).")
+    if og is not None and wf and not before:
+        lines.append(
+            f"The honey went straight onto the {p['fruit']['item']} with next "
+            "to no water, so today's reading depends on how much juice has "
+            "come out — there's no target to hold it to. The plan's OG "
+            f"{sg(p['og'])} goes on the record; log a reading in a couple of "
+            "days, once the fruit has broken down.")
+        og = p["og"]
+    elif og is not None:
+        target_og = before["target"] if before else p["og"]
+        c = calc.correction(og, target_og, gal_now, p["fg"],
                             strain=p["strain"])
-        target = sg(honey_target)
-        if fp:
-            # the fruit's sugar is coming whatever the honey does
-            c["carry_on_abv"] = round(calc.abv(og + fp / 1000.0, p["fg"]), 1)
+        target = sg(target_og)
+        if before:
+            # what the yeast will actually see: this reading blended with the
+            # fruit's juice and sugar
+            c["carry_on_abv"] = round(
+                calc.abv(blended_og(before, og, gal_now), p["fg"]), 1)
+            c["over_tolerance"] = calc.over_tolerance(p["strain"],
+                                                      c["carry_on_abv"])
             lines.append(
-                f"With the {p['fruit']['item']} the hydrometer reads the honey "
-                f"only: target {target} today, and the fruit's ~"
-                f"{num(fp, 1)} points take it to {sg(p['og'])} as they come "
-                "out.")
+                f"Before the {p['fruit']['item']}: target {target} for the "
+                f"honey and water at {num(before['liquid_gal'])} gal. The "
+                "fruit's juice and sugar then take the must to about "
+                f"{sg(p['og'])}.")
         if c["add"] == "none":
             lines.append(f"On target — within {num(calc.ON_TARGET_PTS)} "
                          f"points of {target}, which is hydrometer resolution. "
@@ -166,20 +252,22 @@ def check(p, params):
             ride = (f"let it ride at ~{num(c['carry_on_abv'], 1)} %"
                     + (f", past what {p['strain']} is rated for"
                        if c["over_tolerance"] else ""))
+            room = (f"room for {num(c['new_gal'] + before['fruit_gal'])} gal "
+                    "once the fruit is in" if before else "the room")
             lines.append(
                 f"{num(c['pts'], 1)} points over {target}. Add "
                 f"{gal_l(c['gal'])} water and you'll land on {target} at "
-                f"{num(c['new_gal'])} gal — check the carboy has the room, "
+                f"{num(c['new_gal'])} gal — check the carboy has {room}, "
                 f"and put {num(c['new_gal'])} in 'volume now' when you "
                 f"re-check — or {ride}.")
+        if before:
+            # carried forward to the feeds and the record: the must's OG
+            og = blended_og(before, og, gal_now)
     if not calc.blank(params.get("ph")):
         v = calc.ph_verdict(calc.num(params.get("ph"), "pH", 0, 14))
         lines.append(v["text"])
         if v["kind"] == "warn":
             kind = "warn"
-    if og is not None and fruit_pts(p):
-        # carried forward to the feeds and the record: the must's real OG
-        og = round(og + fruit_pts(p) / 1000.0, 4)
     return "\n".join(lines), kind, og, c
 
 
@@ -188,10 +276,14 @@ def read_form(slug, p, params, checked, correction=None, verdict=None,
     """The design's inset check panel: one row of small fields, the verdict
     beneath it, and a reminder that none of it writes anything."""
     cal_f = params.get("cal_f") or str(DEFAULT_CAL_F)
-    now_gal = params.get("now_gal") or num(p["gal"])
+    wf = reads_before_fruit(p)
+    now_gal = params.get("now_gal") or num(wf["liquid_gal"] if wf else p["gal"])
     if correction and correction.get("add") == "water":
         now_hint = (f"After the top-up that's {num(correction['new_gal'])} "
                     "gal.")
+    elif wf:
+        now_hint = ("Honey and water, before the fruit. Only matters if you "
+                    "diluted or came up short.")
     else:
         now_hint = ("Only matters if you diluted or came up short of the "
                     "mark.")
@@ -208,9 +300,11 @@ def read_form(slug, p, params, checked, correction=None, verdict=None,
     # bound to the check's form by id: it sits outside the <form> for layout,
     # and without form="read" a check never sent it (so a water top-up was
     # silently ignored by everything downstream)
-    now_box = field("now_gal", "Volume in the carboy now", now_gal,
+    now_box = field("now_gal", ("Honey and water now" if wf else
+                                "Volume in the carboy now"), now_gal,
                     now_hint, typ="text", attrs='form="read"')
-    inner = (f'<h3>Read it — before the yeast goes in</h3>'
+    when = "the fruit and the yeast go" if wf else "the yeast goes"
+    inner = (f'<h3>Read it — before {when} in</h3>'
              f'<form class="row" method="get" '
              f'action="/recipes/{esc(slug)}/must" id="read">'
              f'{hidden("gal", num(p["gal"]))}{row}'
@@ -230,6 +324,17 @@ def record_form(slug, p, params, og, next_id, gal_now, now=None):
         return v if v not in (None, "") else default
     now = now or datetime.now().strftime("%Y-%m-%dT%H:%M")
     og_val = g("og", f"{og:.4f}" if og is not None else "")
+    wf = whole_fruit(p)
+    og_hint = ("From the check above, or type it." if not wf else
+               f"The honey-and-water reading blended with the "
+               f"{p['fruit']['item']}'s juice — what the feeds are sized from."
+               if wf["mode"] == "before" else
+               "The plan's OG — today's reading can't separate the honey from "
+               "the fruit. What the feeds are sized from.")
+    vol_hint = ("Honey, water and fruit, after any water you added — the "
+                "feedings are sized from it. Gallons, or 3 bbl." if wf else
+                "After any water you added — the feedings are sized from it. "
+                "Gallons, or 3 bbl.")
     keep = "".join(hidden(k, params.get(k, ""))
                    for k in ("reading", "temp_f", "cal_f", "now_gal"))
     return f"""<form class="inline" method="post" action="/recipes/{esc(slug)}/must" id="record-form">
@@ -237,9 +342,9 @@ def record_form(slug, p, params, og, next_id, gal_now, now=None):
 <div class="grid">
 <span>{field("id", "Batch id", g("id", next_id), "The next number; type your own (even just 003) to continue a numbering from elsewhere.", typ="text", required=True, id_="rec-id")}</span>
 <span>{field("pitched_at", "Yeast pitched at", g("pitched_at", now), "The feeding clock starts here.", typ="datetime-local", step=None, required=True, id_="rec-pitched")}</span>
-<span>{field("og", "OG (corrected)", og_val, (f"The honey reading plus the fruit's ~{num(fruit_pts(p), 1)} points — what the feeds are sized from." if fruit_pts(p) else "From the check above, or type it."), step="0.0001", required=True, id_="rec-og")}</span>
+<span>{field("og", "OG (corrected)", og_val, og_hint, step="0.0001", required=True, id_="rec-og")}</span>
 <span>{field("ph", "pH", g("ph"), "Optional.", step="0.01", id_="rec-ph")}</span>
-<span>{field("volume_gal", "In the carboy now", g("volume_gal", num(gal_now)), "After any water you added — the feedings are sized from it. Gallons, or 3 bbl.", typ="text", id_="rec-volume")}</span>
+<span>{field("volume_gal", "In the carboy now", g("volume_gal", num(gal_now)), vol_hint, typ="text", id_="rec-volume")}</span>
 <span>{field("honey_lb", "Honey in (lb)", g("honey_lb", num(p["honey_lb"])), "What the scale said, including anything stirred in after the check.", id_="rec-honey")}</span>
 <span>{field("water_gal", "Water in (gal)", g("water_gal", num(p["water_gal"])), "Blank is fine if it was all honey and top-up.", id_="rec-water")}</span>
 <span>{field("yeast_g", "Yeast (g)", g("yeast_g", num(p["yeast_g"], 1)), None, id_="rec-yeast")}</span>
@@ -264,11 +369,11 @@ def must_page(req, params, msg=None, kind="ok"):
     verdict = vkind = og = corr = None
     try:
         verdict, vkind, og, corr = check(p, params)
-        gal_now = now_gal_from(p, params)
+        vol_now = must_volume(p, now_gal_from(p, params))
     except ValueError as e:
         # a fat-fingered reading: say so, keep the sheet and the forms
         msg, kind = str(e), "err"
-        gal_now = p["gal"]
+        vol_now = p["gal"]
     last_line = None
     if last and (last.get("measured") or {}).get("og") is not None:
         last_line = (f"last time {last['id']} came in at "
@@ -288,7 +393,7 @@ def must_page(req, params, msg=None, kind="ok"):
     next_id = calc.next_batch_id(existing, year)
     if params.get("id") and params["id"].strip().upper() in existing:
         params = dict(params, id="")       # offer the next one instead
-    rec = record_form(r["slug"], p, params, og, next_id, gal_now)
+    rec = record_form(r["slug"], p, params, og, next_id, vol_now)
     # the whole of must day in one card: what you do, then the reading that
     # tells you whether it worked
     tag = pill("{} · next id {}".format(calc.vol_text(p["gal"]), next_id), "ok")
@@ -296,9 +401,12 @@ def must_page(req, params, msg=None, kind="ok"):
         '<div class="card">'
         '<div class="sheet-head"><h2>Must day, in floor order</h2>'
         + tag + "</div>"
-        + steps(p, og, gal_now)
+        + steps(p, og, vol_now)
         + read_form(r["slug"], p, params, bool(verdict), corr, verdict, vkind)
-        + "</div>")
+        + "</div>"
+        # the additions and method the sheet can't hold (enzyme, tannin,
+        # what goes in at pitch) — folded, but on the page you brew from
+        + notes_block(r, p["gal"]))
     body = (card(strip) + must_card
             + '<h2 id="record" class="noprint">Pitched? Record it</h2>'
             + rec

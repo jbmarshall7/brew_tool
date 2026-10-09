@@ -6,6 +6,40 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-10-08 — the recipes, checked against their sources (round 15, the
+  owner's ask).** Every reference recipe was re-read at its source (AHA
+  pages signed in, the Brew Dudes post, the Gotmead thread) and compared
+  line by line. What was wrong:
+  - **Must day misread whole fruit.** The plan counts the fruit's volume
+    inside the batch, but round 13's honey-only target spread the honey over
+    that whole volume too — fruit's room included, which no hydrometer sees.
+    A cherry mead's honey and water read ~60 points over it and the page said
+    to add three gallons of water. Now a melomel on whole fruit is read
+    before the fruit goes in (floor order: honey, water, read, fruit, pitch),
+    the target is the honey's points over the honey and water, a top-up is
+    sized on that, and the record carries the reading blended with the
+    fruit's juice and sugar (`views_must.whole_fruit`, `blended_og`). With
+    next to no water the honey goes straight onto the fruit, so there's no
+    target: the plan's OG is recorded and a later reading tells the truth.
+  - **The melomels didn't make the published recipes.** The sources' batch
+    sizes are honey + water with the fruit on top, but they were imported as
+    if the fruit sat inside: Bucktart planned 1.8 gal of water where the
+    recipe says 3.8, and VT HoD 17.6 % where it says 14. They're now saved at
+    the volume the published amounts really make (7.2, 5.9, 5.7, 5.6 and 7.7
+    gal), so the sheet shows the published honey, fruit and water.
+  - **Notes were one collapsed run-on paragraph.** They're open on the
+    recipe page, keep their lines, say the factor when the batch isn't the
+    size they were written for, and ride along (folded) on must day — where
+    the enzyme, tannin and bentonite go in. Each was rewritten as the source's
+    method: as published, step by step, how the app reads it, where it's from.
+  - Smaller gaps filled: Mead Me's optional keg Campden and distilled water,
+    the metheglin's spice-tea amounts, the triple berry's tartaric acid and
+    aging SO2; lime juice no longer counted as 12 % sugar; a juice source the
+    author never named removed.
+  Later additions (secondary fruit, oak, spice teas, back-sweetening honey)
+  still live in the notes as prose; making them scale on the sheet is the
+  open next step.
+
 - **2026-10-08 — usable at eight batches (round 14).** Measured on a seeded
   8-batch cellar at phone size (375×812):
   - **Today holds what's in a tank.** Bottled batches move to a short Bottled

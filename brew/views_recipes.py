@@ -78,6 +78,22 @@ def plan_for(r, gal):
     return plan_from(inp)
 
 
+def notes_block(r, gal, open_=False):
+    """A recipe's notes as written, a line per line, and — when the batch
+    isn't the size they were written for — the factor to scale their
+    amounts by (they're prose, so the sheet can't scale them itself)."""
+    if not r.get("notes"):
+        return ""
+    design = r.get("design_gal")
+    scale = ""
+    if design and abs(gal - design) > 0.005:
+        scale = (f'<p class="mut">Amounts in these notes are written for '
+                 f'{esc(calc.vol_text(design))}; at {esc(calc.vol_text(gal))} '
+                 f'multiply them × {num(gal / design, 2)}.</p>')
+    return details("Notes", f'<div class="inner notes">{scale}'
+                            f'{esc(r["notes"])}</div>', open_)
+
+
 def strength_line(r):
     """Always from a fresh plan, never from the file's cached `computed`."""
     try:
@@ -222,8 +238,7 @@ def recipe(req):
 <div class="grid"><span>{field("gal", "How much are you making?", req.params.get("gal") or f"{num(p['gal'])} gal", "Gallons, BBL or liters: 6, 6.8 gal, 3 bbl, 350 L. A BBL is 31 gal.", typ="text")}</span></div>
 <button>Make must</button>
 <button class="quiet" formaction="/recipes/{esc(r['slug'])}">Just show the sheet</button></form>"""
-    notes = details("Notes", f'<div class="inner">{esc(r["notes"])}</div>') \
-        if r.get("notes") else ""
+    notes = notes_block(r, p["gal"], open_=True)
     batches = req.store.batches_for_recipe(r["slug"])
     if batches:
         from .views_batches import when

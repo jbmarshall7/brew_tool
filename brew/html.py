@@ -275,6 +275,9 @@ details.sec > form.inline, details.sec > .inner {
         border-top:none; }
 .inner { background:var(--card); border:none; padding:18px 26px;
          box-shadow:var(--shadow); }
+/* a recipe's notes are written in lines: keep them */
+.notes { white-space:pre-line; font-size:14.5px; line-height:1.6; }
+.notes p.mut { white-space:normal; margin:0 0 10px; }
 
 /* — the must-day steps: sage circles, bigger values — */
 ol.steps { list-style:none; counter-reset:step; padding:0; margin:18px 0 0;

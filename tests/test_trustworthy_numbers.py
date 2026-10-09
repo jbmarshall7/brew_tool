@@ -80,13 +80,15 @@ class MustDayFruitTest(Case):
     def test_whole_fruit_is_a_step_and_the_check_reads_the_honey_only(self):
         r = self.recipe("Blue", "blueberry", 12)
         p = plan_for(r, 6)
-        honey_only = p["og"] - p["fruit"]["points"] / 1000
-        body = self.must(r, reading=f"{honey_only:.4f}", temp_f="60").body
+        # the honey sits in the honey and water alone until the fruit goes
+        # in (round 15: it was judged over the whole batch, fruit's room too)
+        honey_water = 1 + p["honey_lb"] * 35 / (p["honey_gal"] + p["water_gal"]) / 1000
+        body = self.must(r, reading=f"{honey_water:.4f}", temp_f="60").body
         self.assertIn("mesh bag", body)                       # the Fruit step
         self.assertIn("On target", body)                      # honey-only target
         og = re.search(r'id="rec-og"[^>]*value="([^"]+)"', body).group(1)
-        # carried forward with the fruit's points added back: the real OG,
-        # which the feeds are sized from
+        # carried forward blended with the fruit's juice and sugar: the real
+        # OG, which the feeds are sized from
         self.assertAlmostEqual(float(og), p["og"], places=3)
 
     def test_juice_is_counted_by_the_hydrometer_today(self):
