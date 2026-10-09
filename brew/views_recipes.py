@@ -6,7 +6,7 @@ from . import calc
 from .html import (banner, card, details, esc, field, hidden, kv,
                    next_link, num, page as _page, pill, raw, sg, table)
 from .server import Response, redirect, route
-from .sheet import product_name, render_sheet
+from .sheet import extras_card, product_name, render_sheet
 from .store import slugify
 from .views_design import DEFAULTS, inputs_from, plan_from
 
@@ -43,6 +43,9 @@ def recipe_from_form(f):
                    "sugar_pct": p["fruit"]["sugar_pct"]}
                   if p.get("fruit") else None),
         "notes": (f.get("notes") or "").strip(),
+        # spice, citrus, oak, enzyme, back-sweetening honey: amounts written
+        # for design_gal, scaled wherever the recipe is made
+        "extras": calc.parse_extras(f.get("extras")),
         "updated": date.today().isoformat(),
         "computed": computed_from(p),
     }
@@ -78,6 +81,22 @@ def plan_for(r, gal):
     return plan_from(inp)
 
 
+def notes_block(r, gal, open_=False):
+    """A recipe's notes as written, a line per line, and — when the batch
+    isn't the size they were written for — the factor to scale their
+    amounts by (they're prose, so the sheet can't scale them itself)."""
+    if not r.get("notes"):
+        return ""
+    design = r.get("design_gal")
+    scale = ""
+    if design and abs(gal - design) > 0.005:
+        scale = (f'<p class="mut">Amounts in these notes are written for '
+                 f'{esc(calc.vol_text(design))}; at {esc(calc.vol_text(gal))} '
+                 f'multiply them × {num(gal / design, 2)}.</p>')
+    return details("Notes", f'<div class="inner notes">{scale}'
+                            f'{esc(r["notes"])}</div>', open_)
+
+
 def strength_line(r):
     """Always from a fresh plan, never from the file's cached `computed`."""
     try:
@@ -92,6 +111,7 @@ def keep_design(form):
     keep = {k: form.get(k, "") for k in DEFAULTS}
     keep.update({"name": form.get("name", ""), "honey": form.get("honey", ""),
                  "notes": form.get("notes", ""),
+                 "extras": form.get("extras", ""),
                  # a refused redesign keeps its "what changed" line too
                  "changelog": form.get("changelog", "")})
     if form.get("from_slug"):
@@ -116,7 +136,7 @@ def save(req):
                 "changelog": changelog,
                 "abv_if_dry": c.get("abv_if_dry"), "og": c.get("og"),
                 "honey_lb": c.get("honey_lb"), "strength": rec["strength"],
-                "fruit": rec.get("fruit")}
+                "fruit": rec.get("fruit"), "extras": rec.get("extras")}
 
     if from_slug:
         # a redesign keeps its slug and appends a version with a changelog,
@@ -222,8 +242,7 @@ def recipe(req):
 <div class="grid"><span>{field("gal", "How much are you making?", req.params.get("gal") or f"{num(p['gal'])} gal", "Gallons, BBL or liters: 6, 6.8 gal, 3 bbl, 350 L. A BBL is 31 gal.", typ="text")}</span></div>
 <button>Make must</button>
 <button class="quiet" formaction="/recipes/{esc(r['slug'])}">Just show the sheet</button></form>"""
-    notes = details("Notes", f'<div class="inner">{esc(r["notes"])}</div>') \
-        if r.get("notes") else ""
+    notes = notes_block(r, p["gal"], open_=True)
     batches = req.store.batches_for_recipe(r["slug"])
     if batches:
         from .views_batches import when
@@ -253,6 +272,8 @@ def recipe(req):
             + next_link(f"/design?recipe={r['slug']}", "Redesign")
             + scale_form
             + render_sheet(p, f"At {calc.vol_text(p['gal'])} you'll need")
+            + extras_card(r.get("extras"), p["gal"],
+                          r.get("design_gal") or p["gal"])
             + notes + batch_block + version_block
             + f'<p class="mut">Updated {esc(r.get("updated") or "—")}, '
               f'v{r.get("version", 1)}. '

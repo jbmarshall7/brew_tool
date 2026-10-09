@@ -6,6 +6,52 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
 
 ## Changed after the design
 
+- **2026-10-08 — the recipes, checked against their sources (round 15, the
+  owner's ask).** Every reference recipe was re-read at its source (AHA
+  pages signed in, the Brew Dudes post, the Gotmead thread) and compared
+  line by line. What was wrong:
+  - **Must day misread whole fruit.** The plan counts the fruit's volume
+    inside the batch, but round 13's honey-only target spread the honey over
+    that whole volume too — fruit's room included, which no hydrometer sees.
+    A cherry mead's honey and water read ~60 points over it and the page said
+    to add three gallons of water. Now a melomel on whole fruit is read
+    before the fruit goes in (floor order: honey, water, read, fruit, pitch),
+    the target is the honey's points over the honey and water, a top-up is
+    sized on that, and the record carries the reading blended with the
+    fruit's juice and sugar (`views_must.whole_fruit`, `blended_og`). With
+    next to no water the honey goes straight onto the fruit, so there's no
+    target: the plan's OG is recorded and a later reading tells the truth.
+  - **The melomels didn't make the published recipes.** The sources' batch
+    sizes are honey + water with the fruit on top, but they were imported as
+    if the fruit sat inside: Bucktart planned 1.8 gal of water where the
+    recipe says 3.8, and VT HoD 17.6 % where it says 14. They're now saved at
+    the volume the published amounts really make (7.2, 5.9, 5.7, 5.6 and 7.7
+    gal), so the sheet shows the published honey, fruit and water.
+  - **Notes were one collapsed run-on paragraph.** They're open on the
+    recipe page, keep their lines, say the factor when the batch isn't the
+    size they were written for, and ride along (folded) on must day — where
+    the enzyme, tannin and bentonite go in. Each was rewritten as the source's
+    method: as published, step by step, how the app reads it, where it's from.
+  - Smaller gaps filled: Mead Me's optional keg Campden and distilled water,
+    the metheglin's spice-tea amounts, the triple berry's tartaric acid and
+    aging SO2; lime juice no longer counted as 12 % sugar; a juice source the
+    author never named removed.
+  - **Everything else that goes in is part of the recipe** (the owner: the
+    metheglin's cinnamon and vanilla and the melomel's lime were only in the
+    notes). A recipe carries `extras`: spice, citrus, oak, enzyme, tannin,
+    acid, fining, back-sweetening honey, water — typed one per line under
+    when it goes in ("Secondary:" then "26 fl oz key lime juice"), the way a
+    recipe card is written (`calc.parse_extras`). A line that starts with an
+    amount scales with the batch, shown in the unit a cellar measures it in —
+    at 3 BBL the lime juice is 3.78 gal, not 484 fl oz, and a tablespoon of
+    cinnamon is 1.16 cups (`extra_amount`); one that doesn't ("tartaric
+    acid, to taste", "100 % RO water") stays as written. The recipe page
+    lists them by when; the must-day ones join the must-day steps before the
+    yeast; Design has the box, and a redesign starts from what was saved and
+    snapshots it with the version. Kept apart from `additions`, which is
+    still the Fermaid O feeding count. The brewers' own nutrients stay in the
+    notes: the sheet plans Fermaid-O, and listing both invites a double dose.
+
 - **2026-10-08 — usable at eight batches (round 14).** Measured on a seeded
   8-batch cellar at phone size (375×812):
   - **Today holds what's in a tank.** Bottled batches move to a short Bottled

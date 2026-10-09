@@ -275,6 +275,14 @@ details.sec > form.inline, details.sec > .inner {
         border-top:none; }
 .inner { background:var(--card); border:none; padding:18px 26px;
          box-shadow:var(--shadow); }
+/* everything else that goes in: a list per "when", amounts in the head face */
+.extras ul { list-style:none; margin:0; padding:0; }
+.extras li { font-size:16px; line-height:1.45; margin:3px 0; }
+.extras .amt { font-family:var(--font-head); font-size:18px; }
+.extras p.mut { margin:12px 0 0; }
+/* a recipe's notes are written in lines: keep them */
+.notes { white-space:pre-line; font-size:14.5px; line-height:1.6; }
+.notes p.mut { white-space:normal; margin:0 0 10px; }
 
 /* — the must-day steps: sage circles, bigger values — */
 ol.steps { list-style:none; counter-reset:step; padding:0; margin:18px 0 0;

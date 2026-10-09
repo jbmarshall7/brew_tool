@@ -102,6 +102,33 @@ def rows(p):
     return rows
 
 
+def extras_card(extras, gal, design_gal):
+    """Everything else that goes in — spice, citrus, oak, enzyme, the honey
+    that back-sweetens — grouped by when, at `gal`."""
+    if not extras:
+        return ""
+    factor = gal / design_gal if design_gal else 1.0
+    groups = []
+    for e in extras:
+        if not groups or groups[-1][0] != e.get("when", ""):
+            groups.append((e.get("when", ""), []))
+        groups[-1][1].append(e)
+
+    def li(e):
+        amt = calc.extra_amount(e, factor)
+        return ("<li>" + (f'<span class="amt">{esc(amt)}</span> ' if amt else "")
+                + f"{esc(e['what'])}</li>")
+    rows = "".join(f'<div class="kv"><b>{esc(when or "Also")}</b><ul>'
+                   + "".join(li(e) for e in items) + "</ul></div>"
+                   for when, items in groups)
+    scaled = abs(factor - 1.0) >= 0.005
+    note = ((f"Scaled from the recipe's {calc.vol_text(design_gal)}. " if scaled
+             else "") + "A line without an amount is as written.")
+    return (f'<div class="card extras"><div class="sheet-head"><h2>Also goes '
+            f'in</h2>{pill("at " + calc.vol_text(gal))}</div>{rows}'
+            f'<p class="mut">{esc(note)}</p></div>')
+
+
 def render_sheet(p, title=None):
     head = ""
     if title:
