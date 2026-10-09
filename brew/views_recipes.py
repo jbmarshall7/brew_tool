@@ -6,7 +6,7 @@ from . import calc
 from .html import (banner, card, details, esc, field, hidden, kv,
                    next_link, num, page as _page, pill, raw, sg, table)
 from .server import Response, redirect, route
-from .sheet import product_name, render_sheet
+from .sheet import extras_card, product_name, render_sheet
 from .store import slugify
 from .views_design import DEFAULTS, inputs_from, plan_from
 
@@ -43,6 +43,9 @@ def recipe_from_form(f):
                    "sugar_pct": p["fruit"]["sugar_pct"]}
                   if p.get("fruit") else None),
         "notes": (f.get("notes") or "").strip(),
+        # spice, citrus, oak, enzyme, back-sweetening honey: amounts written
+        # for design_gal, scaled wherever the recipe is made
+        "extras": calc.parse_extras(f.get("extras")),
         "updated": date.today().isoformat(),
         "computed": computed_from(p),
     }
@@ -108,6 +111,7 @@ def keep_design(form):
     keep = {k: form.get(k, "") for k in DEFAULTS}
     keep.update({"name": form.get("name", ""), "honey": form.get("honey", ""),
                  "notes": form.get("notes", ""),
+                 "extras": form.get("extras", ""),
                  # a refused redesign keeps its "what changed" line too
                  "changelog": form.get("changelog", "")})
     if form.get("from_slug"):
@@ -132,7 +136,7 @@ def save(req):
                 "changelog": changelog,
                 "abv_if_dry": c.get("abv_if_dry"), "og": c.get("og"),
                 "honey_lb": c.get("honey_lb"), "strength": rec["strength"],
-                "fruit": rec.get("fruit")}
+                "fruit": rec.get("fruit"), "extras": rec.get("extras")}
 
     if from_slug:
         # a redesign keeps its slug and appends a version with a changelog,
@@ -268,6 +272,8 @@ def recipe(req):
             + next_link(f"/design?recipe={r['slug']}", "Redesign")
             + scale_form
             + render_sheet(p, f"At {calc.vol_text(p['gal'])} you'll need")
+            + extras_card(r.get("extras"), p["gal"],
+                          r.get("design_gal") or p["gal"])
             + notes + batch_block + version_block
             + f'<p class="mut">Updated {esc(r.get("updated") or "—")}, '
               f'v{r.get("version", 1)}. '

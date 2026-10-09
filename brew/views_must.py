@@ -94,8 +94,9 @@ def feeds(p, og=None, gal=None):
                      "re-check after a top-up and these move with it."}
 
 
-def steps(p, og=None, gal=None):
-    """The five things you do, in the order you do them."""
+def steps(p, og=None, gal=None, extras=None):
+    """The things you do, in the order you do them. `extras` are the
+    recipe's must-day additions, already scaled to this batch."""
     pname = product_name(p["product"])
     n = p["additions"]
     fd = feeds(p, og, gal)
@@ -152,6 +153,9 @@ def steps(p, og=None, gal=None):
               "water.")),
             read,
         ]
+    if extras:
+        items.append(("Also in it", " · ".join(extras),
+                      "From the recipe's must-day list — in before the yeast."))
     items += [
         ("Rehydrate and pitch",
          f"{calc.ml_text(p['goferm_water_ml'])} water at {calc.REHYDRATE_F} °F, "
@@ -401,7 +405,9 @@ def must_page(req, params, msg=None, kind="ok"):
         '<div class="card">'
         '<div class="sheet-head"><h2>Must day, in floor order</h2>'
         + tag + "</div>"
-        + steps(p, og, vol_now)
+        + steps(p, og, vol_now, [
+            calc.extra_line(e, p["gal"] / (r.get("design_gal") or p["gal"]))
+            for e in r.get("extras") or [] if calc.must_day(e.get("when"))])
         + read_form(r["slug"], p, params, bool(verdict), corr, verdict, vkind)
         + "</div>"
         # the additions and method the sheet can't hold (enzyme, tannin,

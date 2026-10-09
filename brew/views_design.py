@@ -117,6 +117,13 @@ def targets_card(inp, p=None, store=None):
 </div>"""
 
 
+def extras_value(params, editing):
+    """The other-ingredients box: as typed, else as the recipe saved it."""
+    if "extras" in params:
+        return params["extras"]
+    return calc.extras_text(editing.get("extras")) if editing else ""
+
+
 def save_card(store, editing=None, params=None):
     """Card 3: name it and keep it. `editing` is the recipe being redesigned."""
     params = params or {}
@@ -127,6 +134,7 @@ def save_card(store, editing=None, params=None):
     name = params.get("name", editing["name"] if editing else "")
     honey = params.get("honey", editing.get("honey", "") if editing else "")
     notes = params.get("notes", editing.get("notes", "") if editing else "")
+    extras = extras_value(params, editing)
     changelog = (field("changelog", "What changed? (kept as a version note)",
                        params.get("changelog", ""),
                        "e.g. raised the OG, switched to D47.", typ="text",
@@ -136,6 +144,7 @@ def save_card(store, editing=None, params=None):
 {field("name", "Name", name, "The honey and the strength make a good one.", typ="text", required=True)}
 {field("honey", "Honey", honey, "Which honey this was designed around.", typ="text", attrs='list="honeys"')}
 <datalist id="honeys">{honey_list}</datalist>
+{textarea("extras", "Everything else that goes in", extras, "Spice, citrus, oak, enzyme, acid, fining, back-sweetening honey — one per line under when it goes in, e.g. Secondary: then 26 fl oz key lime juice. A line that starts with an amount scales with the batch; must-day ones join the must-day steps.")}
 {textarea("notes", "Notes", notes, "Anything the sheet doesn't say: where the honey came from, what you'd change.")}
 {changelog}
 <button class="block" formmethod="post" formaction="/recipes">{esc(label)}</button></div>"""
@@ -154,7 +163,7 @@ def render(params, store=None, msg=None, kind="ok"):
         p = plan_from(inp)
     except ValueError as e:
         p, err = None, str(e)
-    from .sheet import render_sheet
+    from .sheet import extras_card, render_sheet
     keep = hidden("recipe", editing["slug"]) if editing else ""
     keep += hidden("from_slug", editing["slug"]) if editing else ""
     left = targets_card(inp, p, store)
@@ -162,6 +171,9 @@ def render(params, store=None, msg=None, kind="ok"):
     if p:
         left += save_card(store, editing, params)
         right = render_sheet(p, f"At {calc.vol_text(p['gal'])} you'll need")
+        # as typed: the amounts in the box are for this design's volume
+        right += extras_card(calc.parse_extras(extras_value(params, editing)),
+                             p["gal"], p["gal"])
         right += next_link(must_href(editing, p) if editing else "/recipes",
                            f"Make must at {calc.vol_text(p['gal'])}"
                            if editing else "Every recipe you've kept")

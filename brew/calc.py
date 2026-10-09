@@ -201,6 +201,170 @@ def ml_text(ml):
     return f"{num_(ml / 1000, 1)} L" if ml >= 1000 else f"{round(ml)} mL"
 
 
+# --- everything else that goes in --------------------------------------------
+# Spice, citrus, oak, enzyme, tannin, acid, fining, the honey that back-
+# sweetens: one per line under a "When:" heading, the way a recipe card is
+# written. A line that starts with an amount scales with the batch; one that
+# doesn't ("tartaric acid, to taste") is kept as written. Nothing is refused —
+# a line that can't be read as an amount is shown exactly as typed.
+UNITS = {
+    # canonical unit: (what it measures, its size in that measure's base)
+    "tsp": ("vol", 1.0), "Tbsp": ("vol", 3.0), "fl oz": ("vol", 6.0),
+    "cup": ("vol", 48.0), "qt": ("vol", 192.0), "gal": ("vol", 768.0),
+    "mL": ("ml", 1.0), "L": ("ml", 1000.0),
+    "oz": ("wt", 1.0), "lb": ("wt", 16.0),
+    "g": ("g", 1.0), "kg": ("g", 1000.0),
+}
+# a scaled amount is shown in the biggest of these that's at least 1 —
+# spoons climb to cups and gallons, a juice stays in fluid ounces until it
+# is gallons
+LADDERS = {"tsp": ("tsp", "Tbsp", "cup", "gal"),
+           "fl oz": ("fl oz", "gal"), "mL": ("mL", "L"),
+           "oz": ("oz", "lb"), "g": ("g", "kg")}
+LADDERS.update({"Tbsp": LADDERS["tsp"], "cup": LADDERS["tsp"],
+                "qt": LADDERS["fl oz"], "gal": LADDERS["fl oz"],
+                "L": LADDERS["mL"], "lb": LADDERS["oz"], "kg": LADDERS["g"]})
+_UNIT_WORDS = {
+    "teaspoons": "tsp", "teaspoon": "tsp", "tsp": "tsp",
+    "tablespoons": "Tbsp", "tablespoon": "Tbsp", "tbsp": "Tbsp", "tbs": "Tbsp",
+    "fluid ounces": "fl oz", "fluid ounce": "fl oz", "fl. oz": "fl oz",
+    "fl oz": "fl oz", "floz": "fl oz", "cups": "cup", "cup": "cup",
+    "quarts": "qt", "quart": "qt", "qt": "qt",
+    "gallons": "gal", "gallon": "gal", "gal": "gal",
+    "milliliters": "mL", "millilitres": "mL", "milliliter": "mL",
+    "millilitre": "mL", "ml": "mL",
+    "liters": "L", "litres": "L", "liter": "L", "litre": "L", "l": "L",
+    "ounces": "oz", "ounce": "oz", "oz": "oz",
+    "pounds": "lb", "pound": "lb", "lbs": "lb", "lb": "lb",
+    "grams": "g", "gram": "g", "g": "g",
+    "kilograms": "kg", "kilogram": "kg", "kg": "kg",
+}
+_UNIT = re.compile(
+    "(" + "|".join(re.escape(w) for w in sorted(_UNIT_WORDS, key=len,
+                                                reverse=True))
+    + r")\.?(?=\s|$)", re.I)
+# counted things that read in the plural: "19 packets Super-Kleer"
+COUNT_UNITS = ("packet", "pack", "sachet", "tablet", "spiral", "stick",
+               "bean", "pod", "cube")
+_FRACTION = {"½": 0.5, "¼": 0.25, "¾": 0.75, "⅓": 1 / 3, "⅔": 2 / 3,
+             "⅛": 0.125}
+_QTY = re.compile(r"\s*(\d+\s+\d+/\d+|\d+/\d+|\d+(?:[.,]\d+)?(?:\s?[½¼¾⅓⅔⅛])?"
+                  r"|[½¼¾⅓⅔⅛])")
+# a number that's a strength, not an amount: "100 % RO water", "30 ppm"
+_NOT_AMOUNT = re.compile(r"(%|ppm\b|°)", re.I)
+# a "when" that means the day the must is made
+MUST_DAY = re.compile(r"\b(must|pitch|mix|primary|start)", re.I)
+
+
+def _qty_value(text):
+    total = 0.0
+    for part in text.replace(",", ".").split():
+        if "/" in part:
+            a, b = part.split("/")
+            total += float(a) / float(b) if float(b) else 0.0
+        elif part[-1] in _FRACTION:
+            total += (float(part[:-1]) if part[:-1] else 0.0) + _FRACTION[part[-1]]
+        else:
+            total += float(part)
+    return total
+
+
+def parse_extra(line):
+    """One line: {qty, unit, what, amount} — `amount` as typed ('¼ spiral'),
+    or qty None when the line doesn't start with one."""
+    plain = {"qty": None, "unit": "", "what": line.strip(), "amount": ""}
+    m = _QTY.match(line)
+    if not m:
+        return plain
+    rest = line[m.end():]
+    glued = rest[:1] not in ("", " ", "\t")      # "10g", but "71B" isn't one
+    rest = rest.strip()
+    if _NOT_AMOUNT.match(rest):
+        return plain
+    unit = ""
+    u = _UNIT.match(rest)
+    if u:
+        unit = _UNIT_WORDS[u.group(1).lower()]
+        rest = rest[u.end():].strip()
+    elif glued:
+        return plain
+    else:
+        word, _, tail = rest.partition(" ")
+        if word.lower().rstrip("s") in COUNT_UNITS and tail:
+            unit, rest = word.lower().rstrip("s"), tail.strip()
+    qty = _qty_value(m.group(1))
+    if not rest or qty <= 0:
+        return plain
+    whole = line.strip()
+    return {"qty": qty, "unit": unit, "what": rest,
+            "amount": whole[:len(whole) - len(rest)].strip()}
+
+
+def parse_extras(text):
+    """The other-ingredients box: lines ending in ':' are when it goes in
+    ('Secondary:'), the lines under them are what — in the order typed."""
+    out, when = [], ""
+    for line in (text or "").splitlines():
+        line = line.strip().lstrip("•*·–- ").strip()
+        if not line:
+            continue
+        if line.endswith(":") and parse_extra(line[:-1])["qty"] is None:
+            when = line[:-1].strip()
+            continue
+        out.append(dict(parse_extra(line), when=when))
+    return out
+
+
+def extras_text(extras):
+    """Back to the box, so a redesign starts from what was saved."""
+    lines, when = [], None
+    for e in extras or []:
+        if e.get("when", "") != when:
+            when = e.get("when", "")
+            if lines:
+                lines.append("")
+            if when:
+                lines.append(f"{when}:")
+        lines.append(f"{e['amount']} {e['what']}" if e.get("amount")
+                     else e["what"])
+    return "\n".join(lines)
+
+
+def must_day(when):
+    return bool(MUST_DAY.search(when or ""))
+
+
+def extra_amount(e, factor=1.0):
+    """The amount for `factor` × the recipe's volume, in the unit a cellar
+    would measure it in (18.6 Tbsp reads as 1.16 cups, 484 fl oz as
+    3.78 gal) — or as typed at the recipe's own size. '' when there's none."""
+    if e.get("qty") is None:
+        return ""
+    if abs(factor - 1.0) < 0.005:
+        return e.get("amount") or num_(e["qty"])
+    q, unit = e["qty"] * factor, e.get("unit") or ""
+    if unit in UNITS:
+        base = q * UNITS[unit][1]
+        pick = LADDERS[unit][0]
+        for u in LADDERS[unit]:
+            if base / UNITS[u][1] >= 1:
+                pick = u
+        q, unit = base / UNITS[pick][1], pick
+        figure = (str(round(q)) if q >= 100 else
+                  num_(q, 1) if q >= 10 else num_(q, 2))
+    else:
+        figure = (str(round(q)) if q >= 10 else
+                  num_(q, 1) if q >= 1 else num_(q, 2))
+    if unit == "cup" or unit in COUNT_UNITS:
+        unit += "" if figure == "1" else "s"
+    return f"{figure} {unit}".strip()
+
+
+def extra_line(e, factor=1.0):
+    amt = extra_amount(e, factor)
+    return f"{amt} {e['what']}" if amt else e["what"]
+
+
 # --- gravity and alcohol ----------------------------------------------------
 def num_(x, dp=2):
     ss = f'{round(float(x), dp):.{dp}f}'.rstrip('0').rstrip('.')

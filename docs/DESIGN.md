@@ -36,9 +36,21 @@ small rebuild of the over-scoped meadery_tools app focused on usability.
     the metheglin's spice-tea amounts, the triple berry's tartaric acid and
     aging SO2; lime juice no longer counted as 12 % sugar; a juice source the
     author never named removed.
-  Later additions (secondary fruit, oak, spice teas, back-sweetening honey)
-  still live in the notes as prose; making them scale on the sheet is the
-  open next step.
+  - **Everything else that goes in is part of the recipe** (the owner: the
+    metheglin's cinnamon and vanilla and the melomel's lime were only in the
+    notes). A recipe carries `extras`: spice, citrus, oak, enzyme, tannin,
+    acid, fining, back-sweetening honey, water — typed one per line under
+    when it goes in ("Secondary:" then "26 fl oz key lime juice"), the way a
+    recipe card is written (`calc.parse_extras`). A line that starts with an
+    amount scales with the batch, shown in the unit a cellar measures it in —
+    at 3 BBL the lime juice is 3.78 gal, not 484 fl oz, and a tablespoon of
+    cinnamon is 1.16 cups (`extra_amount`); one that doesn't ("tartaric
+    acid, to taste", "100 % RO water") stays as written. The recipe page
+    lists them by when; the must-day ones join the must-day steps before the
+    yeast; Design has the box, and a redesign starts from what was saved and
+    snapshots it with the version. Kept apart from `additions`, which is
+    still the Fermaid O feeding count. The brewers' own nutrients stay in the
+    notes: the sheet plans Fermaid-O, and listing both invites a double dose.
 
 - **2026-10-08 — usable at eight batches (round 14).** Measured on a seeded
   8-batch cellar at phone size (375×812):
